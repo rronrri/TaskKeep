@@ -8,6 +8,7 @@ export interface SessionUser {
   fullName: string;
   email: string;
   role: UserRole;
+  mustChangePassword?: boolean;
 }
 
 export interface Task {
@@ -20,7 +21,6 @@ export interface Task {
   deadline: string;
   priority: TaskPriority;
   status: TaskStatus;
-  color: string | null;
   is_pinned: boolean;
   created_at: string;
   responsible?: { full_name: string; email: string } | null;

@@ -3,9 +3,23 @@ import { ZodError } from "zod";
 import { getSession } from "@/lib/auth/session";
 import type { UserRole } from "@/types";
 
-export async function requireApiUser(roles?: UserRole[]) {
+export async function requireApiUser(
+  roles?: UserRole[],
+  options?: { allowTemporaryPassword?: boolean },
+) {
   const user = await getSession();
   if (!user) return { error: NextResponse.json({ error: "No autenticado" }, { status: 401 }) };
+  if (user.mustChangePassword && !options?.allowTemporaryPassword) {
+    return {
+      error: NextResponse.json(
+        {
+          error: "Debes cambiar tu contraseña temporal antes de continuar",
+          code: "PASSWORD_CHANGE_REQUIRED",
+        },
+        { status: 403 },
+      ),
+    };
+  }
   if (roles && !roles.includes(user.role)) {
     return { error: NextResponse.json({ error: "Acceso denegado" }, { status: 403 }) };
   }

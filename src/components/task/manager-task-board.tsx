@@ -1,86 +1,66 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CalendarClock, Pencil, Pin, PinOff, Plus, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { CalendarClock, ChevronLeft, ChevronRight, Pencil, Pin, PinOff, Plus, Trash2 } from "lucide-react";
 import { format, isBefore } from "date-fns";
 import { es } from "date-fns/locale";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { priorityStyles } from "@/lib/tasks/priority-style";
+import { TaskEditorDialog, type ResponsibleOption } from "./task-editor-dialog";
+import { TaskPreviewDialog } from "./task-preview-dialog";
+import { TaskFilters } from "./task-filters";
 import type { Task, TaskStatus } from "@/types";
 
-const formSchema = z.object({
-  title: z.string().trim().min(2, "Ingresa un título").max(160),
-  description: z.string().trim().max(5000),
-  responsible_id: z.string().uuid("Selecciona un responsable"),
-  deadline: z.string().min(1, "Selecciona una fecha límite"),
-  priority: z.enum(["low", "medium", "high", "critical"]),
-  status: z.enum(["pending", "in_progress", "completed"]),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-  is_pinned: z.boolean(),
-});
-
-type TaskInput = z.infer<typeof formSchema>;
-
-interface Responsible {
-  id: string;
-  full_name: string;
-  email: string;
-  role: "manager" | "collaborator";
-}
-
-const defaults: TaskInput = {
-  title: "",
-  description: "",
-  responsible_id: "",
-  deadline: "",
-  priority: "medium",
-  status: "pending",
-  color: "#fff7cc",
-  is_pinned: false,
-};
-
-const priorityLabel = {
-  low: "Baja",
-  medium: "Media",
-  high: "Alta",
-  critical: "Crítica",
-};
+interface Responsible extends ResponsibleOption { email: string; }
 
 export function ManagerTaskBoard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [responsibles, setResponsibles] = useState<Responsible[]>([]);
   const [editing, setEditing] = useState<Task | null>(null);
+  const [preview, setPreview] = useState<Task | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
+  const [responsibleFilter, setResponsibleFilter] = useState("");
+  const [pinnedFilter, setPinnedFilter] = useState(false);
+  const [search, setSearch] = useState("");
+  const [deadlineFrom, setDeadlineFrom] = useState("");
+  const [deadlineTo, setDeadlineTo] = useState("");
+  const [sort, setSort] = useState("deadline_asc");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [serverError, setServerError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<TaskInput>({
-    resolver: zodResolver(formSchema),
-    defaultValues: defaults,
-  });
-
-  const loadTasks = async () => {
-    const query = new URLSearchParams({ size: "50" });
+  const loadTasks = useCallback(async () => {
+    const query = new URLSearchParams({ size: "12", page: String(page), sort });
     if (statusFilter) query.set("status", statusFilter);
     if (priorityFilter) query.set("priority", priorityFilter);
+    if (responsibleFilter) query.set("responsible_id", responsibleFilter);
+    if (pinnedFilter) query.set("pinned", "true");
+    if (search.trim()) query.set("q", search.trim());
+    if (deadlineFrom) query.set("deadline_from", deadlineFrom);
+    if (deadlineTo) query.set("deadline_to", deadlineTo);
     const response = await fetch(`/api/tasks?${query}`, { cache: "no-store" });
     const body = await response.json();
     if (!response.ok) throw new Error(body.error ?? "No se pudieron cargar las tareas");
     setTasks(body.data ?? []);
-  };
+    setTotal(body.pagination?.total ?? 0);
+    setPreview((current) => current ? (body.data ?? []).find((task: Task) => task.id === current.id) ?? null : null);
+  }, [deadlineFrom, deadlineTo, page, pinnedFilter, priorityFilter, responsibleFilter, search, sort, statusFilter]);
 
   useEffect(() => {
-    const query = new URLSearchParams({ size: "50" });
+    const query = new URLSearchParams({ size: "12", page: String(page), sort });
     if (statusFilter) query.set("status", statusFilter);
     if (priorityFilter) query.set("priority", priorityFilter);
+    if (responsibleFilter) query.set("responsible_id", responsibleFilter);
+    if (pinnedFilter) query.set("pinned", "true");
+    if (search.trim()) query.set("q", search.trim());
+    if (deadlineFrom) query.set("deadline_from", deadlineFrom);
+    if (deadlineTo) query.set("deadline_to", deadlineTo);
     Promise.all([
       fetch(`/api/tasks?${query}`, { cache: "no-store" }),
       fetch("/api/admin/users", { cache: "no-store" }),
@@ -94,69 +74,31 @@ export function ManagerTaskBoard() {
         if (!usersResponse.ok) throw new Error(usersBody.error ?? "No se pudieron cargar los responsables");
         if (!meResponse.ok) throw new Error(meBody.error ?? "No se pudo cargar la sesión");
         setTasks(tasksBody.data ?? []);
+        setTotal(tasksBody.pagination?.total ?? 0);
+        const requestedTask = new URLSearchParams(window.location.search).get("task");
+        if (requestedTask) setPreview((tasksBody.data ?? []).find((task: Task) => task.id === requestedTask) ?? null);
         setResponsibles([
-          {
-            id: meBody.user.id,
-            full_name: `${meBody.user.fullName} (yo)`,
-            email: meBody.user.email,
-            role: "manager",
-          },
+          { id: meBody.user.id, full_name: `${meBody.user.fullName} (yo)`, email: meBody.user.email, role: "manager" },
           ...(usersBody.data ?? []).filter((user: Responsible) => user.id !== meBody.user.id),
         ]);
       })
       .catch((error: unknown) => setServerError(error instanceof Error ? error.message : "No se pudieron cargar los datos"))
       .finally(() => setLoading(false));
-  }, [priorityFilter, statusFilter]);
+  }, [deadlineFrom, deadlineTo, page, pinnedFilter, priorityFilter, responsibleFilter, search, sort, statusFilter]);
 
-  const submit = async (values: TaskInput) => {
-    setServerError("");
-    setNotice("");
-    const payload = {
-      ...values,
-      description: values.description || null,
-      deadline: new Date(values.deadline).toISOString(),
-    };
-    const response = await fetch(editing ? `/api/tasks/${editing.id}` : "/api/tasks", {
-      method: editing ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const body = await response.json();
-    if (!response.ok) {
-      setServerError(body.error ?? "No se pudo guardar la tarea");
-      return;
-    }
-    setNotice(editing ? "Tarea actualizada correctamente." : "Tarea creada correctamente.");
+  const openCreate = () => {
     setEditing(null);
-    reset(defaults);
-    await loadTasks();
+    setEditorOpen(true);
   };
 
-  const startEditing = (task: Task) => {
+  const openEdit = (task: Task) => {
+    setPreview(null);
     setEditing(task);
-    setServerError("");
-    setNotice("");
-    reset({
-      title: task.title,
-      description: task.description ?? "",
-      responsible_id: task.responsible_id,
-      deadline: toLocalDateTime(task.deadline),
-      priority: task.priority,
-      status: task.status,
-      color: task.color ?? "#fff7cc",
-      is_pinned: task.is_pinned,
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setEditorOpen(true);
   };
 
-  const cancelEditing = () => {
-    setEditing(null);
-    reset(defaults);
-  };
-
-  const patchTask = async (task: Task, values: Partial<TaskInput>, success: string) => {
+  const patchTask = async (task: Task, values: Partial<Pick<Task, "is_pinned" | "status">>, success: string) => {
     setServerError("");
-    setNotice("");
     const response = await fetch(`/api/tasks/${task.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -171,154 +113,97 @@ export function ManagerTaskBoard() {
     await loadTasks();
   };
 
-  const removeTask = async (task: Task) => {
-    if (!window.confirm(`¿Eliminar la tarea "${task.title}"?`)) return;
-    const response = await fetch(`/api/tasks/${task.id}`, { method: "DELETE" });
+  const removeTask = async () => {
+    if (!deleteTarget) return;
+    const response = await fetch(`/api/tasks/${deleteTarget.id}`, { method: "DELETE" });
     const body = await response.json();
-    if (!response.ok) return setServerError(body.error ?? "No se pudo eliminar la tarea");
-    if (editing?.id === task.id) cancelEditing();
+    if (!response.ok) throw new Error(body.error ?? "No se pudo eliminar la tarea");
+    setPreview(null);
     setNotice("Tarea eliminada correctamente.");
     await loadTasks();
   };
 
+  const actions = (task: Task) => (
+    <div className="flex gap-1">
+      <button onClick={() => void patchTask(task, { is_pinned: !task.is_pinned }, task.is_pinned ? "Tarea desfijada." : "Tarea fijada.")} className="rounded-lg p-2 hover:bg-white/70" aria-label={task.is_pinned ? "Desfijar tarea" : "Fijar tarea"}>{task.is_pinned ? <PinOff size={17} /> : <Pin size={17} />}</button>
+      <button onClick={() => openEdit(task)} className="rounded-lg p-2 hover:bg-white/70" aria-label={`Editar ${task.title}`}><Pencil size={17} /></button>
+      <button onClick={() => setDeleteTarget(task)} className="rounded-lg p-2 text-red-700 hover:bg-red-50/70" aria-label={`Eliminar ${task.title}`}><Trash2 size={17} /></button>
+    </div>
+  );
+
   return (
     <section>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-bold text-indigo-600">TABLERO</p>
-          <h1 className="font-display text-3xl font-extrabold">Tareas</h1>
-          <p className="mt-2 text-slate-600">Crea, asigna y controla el trabajo de tu empresa.</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <label className="text-sm font-semibold">
-            Estado
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="ml-2 rounded-lg border border-slate-300 bg-white px-3 py-2">
-              <option value="">Todos</option>
-              <option value="pending">Pendiente</option>
-              <option value="in_progress">En curso</option>
-              <option value="completed">Completada</option>
-            </select>
-          </label>
-          <label className="text-sm font-semibold">
-            Prioridad
-            <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="ml-2 rounded-lg border border-slate-300 bg-white px-3 py-2">
-              <option value="">Todas</option>
-              <option value="low">Baja</option>
-              <option value="medium">Media</option>
-              <option value="high">Alta</option>
-              <option value="critical">Crítica</option>
-            </select>
-          </label>
-        </div>
+        <div><p className="text-sm font-bold text-indigo-600">TABLERO</p><h1 className="font-display text-3xl font-extrabold">Tareas</h1><p className="mt-2 text-slate-600">Crea, asigna y controla el trabajo de tu empresa.</p></div>
+        <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white hover:bg-indigo-700"><Plus size={19} /> Nueva tarea</button>
       </div>
 
-      <div className="mt-7 grid gap-6 xl:grid-cols-[400px_1fr]">
-        <form onSubmit={handleSubmit(submit)} className="card h-fit p-6" noValidate>
-          <div className="mb-5 flex items-center justify-between">
-            <h2 className="flex items-center gap-3 font-display text-xl font-extrabold">
-              <span className="rounded-xl bg-indigo-100 p-2 text-indigo-700">{editing ? <Pencil size={20} /> : <Plus size={20} />}</span>
-              {editing ? "Editar tarea" : "Nueva tarea"}
-            </h2>
-            {editing && <button type="button" onClick={cancelEditing} className="rounded-lg p-2 hover:bg-slate-100" aria-label="Cancelar edición"><X size={20} /></button>}
+      <TaskFilters
+        search={search}
+        status={statusFilter}
+        priority={priorityFilter}
+        responsible={responsibleFilter}
+        deadlineFrom={deadlineFrom}
+        deadlineTo={deadlineTo}
+        sort={sort}
+        pinned={pinnedFilter}
+        responsibles={responsibles}
+        showResponsible
+        showPinned
+        viewMode={viewMode}
+        onSearch={(value) => { setPage(1); setSearch(value); }}
+        onStatus={(value) => { setPage(1); setStatusFilter(value); }}
+        onPriority={(value) => { setPage(1); setPriorityFilter(value); }}
+        onResponsible={(value) => { setPage(1); setResponsibleFilter(value); }}
+        onDeadlineFrom={(value) => { setPage(1); setDeadlineFrom(value); }}
+        onDeadlineTo={(value) => { setPage(1); setDeadlineTo(value); }}
+        onSort={(value) => { setPage(1); setSort(value); }}
+        onPinned={(value) => { setPage(1); setPinnedFilter(value); }}
+        onViewMode={setViewMode}
+      />
+
+      {serverError && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800">{serverError}</p>}
+      {notice && <p role="status" className="mt-4 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{notice}</p>}
+      <div className="mt-6">
+        {loading ? <div className="card p-10 text-center text-slate-500">Cargando tareas...</div> : tasks.length === 0 ? <div className="card p-10 text-center text-slate-500">No hay tareas para estos filtros.</div> : viewMode === "cards" ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {tasks.map((task) => {
+              const overdue = task.status !== "completed" && isBefore(new Date(task.deadline), new Date());
+              const priority = priorityStyles[task.priority];
+              return (
+                <article key={task.id} className={`rounded-2xl border p-5 shadow-sm ${priority.card}`}>
+                  <div className="flex items-start justify-between gap-3"><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${priority.badge}`}>Prioridad {priority.label}</span>{actions(task)}</div>
+                  <button onClick={() => setPreview(task)} className="mt-4 block w-full text-left"><h2 className="font-display text-lg font-extrabold hover:text-indigo-700">{task.title}</h2>{task.description && <p className="mt-2 line-clamp-3 text-sm text-slate-700">{task.description}</p>}</button>
+                  <div className="mt-5 space-y-2 text-sm"><p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}><CalendarClock size={17} />{format(new Date(task.deadline), "d MMM yyyy, HH:mm", { locale: es })}{overdue && " · Vencida"}</p><p>Responsable: <strong>{task.responsible?.full_name ?? "Sin nombre"}</strong></p></div>
+                  <label className="mt-5 block border-t border-black/10 pt-4 text-xs font-bold uppercase tracking-wide">Estado<select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="mt-2 w-full rounded-lg border border-black/15 bg-white/75 px-3 py-2 text-sm normal-case"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></label>
+                </article>
+              );
+            })}
           </div>
-
-          <div className="space-y-4">
-            <Field label="Título" error={errors.title?.message}>
-              <input {...register("title")} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" placeholder="Ej. Preparar informe mensual" />
-            </Field>
-            <Field label="Descripción" error={errors.description?.message}>
-              <textarea {...register("description")} rows={4} className="w-full resize-y rounded-xl border border-slate-300 px-3 py-2.5" />
-            </Field>
-            <Field label="Responsable" error={errors.responsible_id?.message}>
-              <select {...register("responsible_id")} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5">
-                <option value="">Selecciona una persona</option>
-                {responsibles.map((person) => <option key={person.id} value={person.id}>{person.full_name} · {person.role === "manager" ? "Gestora" : "Colaboradora"}</option>)}
-              </select>
-            </Field>
-            <Field label="Fecha límite" error={errors.deadline?.message}>
-              <input type="datetime-local" {...register("deadline")} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Prioridad" error={errors.priority?.message}>
-                <select {...register("priority")} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5">
-                  <option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option><option value="critical">Crítica</option>
-                </select>
-              </Field>
-              <Field label="Estado" error={errors.status?.message}>
-                <select {...register("status")} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5">
-                  <option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option>
-                </select>
-              </Field>
-            </div>
-            <div className="grid grid-cols-[1fr_auto] items-end gap-4">
-              <Field label="Color" error={errors.color?.message}>
-                <input type="color" {...register("color")} className="h-11 w-full rounded-xl border border-slate-300 bg-white p-1" />
-              </Field>
-              <label className="flex h-11 items-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-semibold">
-                <input type="checkbox" {...register("is_pinned")} /> Fijar
-              </label>
-            </div>
+        ) : (
+          <div className="card overflow-x-auto">
+            <table className="w-full min-w-[780px] text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-4">Tarea</th><th className="px-5 py-4">Responsable</th><th className="px-5 py-4">Fecha límite</th><th className="px-5 py-4">Estado</th><th className="px-5 py-4 text-right">Acciones</th></tr></thead>
+              <tbody className="divide-y divide-slate-200">
+                {tasks.map((task) => { const priority = priorityStyles[task.priority]; return (
+                  <tr key={task.id} className="hover:bg-slate-50">
+                    <td className="px-5 py-4"><button onClick={() => setPreview(task)} className="text-left"><p className="font-bold hover:text-indigo-700">{task.title}</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${priority.badge}`}>{priority.label}</span></button></td>
+                    <td className="px-5 py-4">{task.responsible?.full_name ?? "Sin nombre"}</td>
+                    <td className="px-5 py-4">{format(new Date(task.deadline), "d MMM yyyy, HH:mm", { locale: es })}</td>
+                    <td className="px-5 py-4"><select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></td>
+                    <td className="px-5 py-4"><div className="flex justify-end">{actions(task)}</div></td>
+                  </tr>
+                ); })}
+              </tbody>
+            </table>
           </div>
-
-          <button disabled={isSubmitting} className="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white hover:bg-indigo-700 disabled:opacity-60">
-            {isSubmitting ? "Guardando..." : editing ? "Guardar cambios" : "Crear tarea"}
-          </button>
-        </form>
-
-        <div className="min-w-0">
-          {serverError && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800">{serverError}</p>}
-          {notice && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{notice}</p>}
-          {loading ? <div className="card p-10 text-center text-slate-500">Cargando tareas...</div> : tasks.length === 0 ? (
-            <div className="card p-10 text-center text-slate-500">No hay tareas para estos filtros.</div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {tasks.map((task) => {
-                const overdue = task.status !== "completed" && isBefore(new Date(task.deadline), new Date());
-                return (
-                  <article key={task.id} className="rounded-2xl border border-black/10 p-5 shadow-sm" style={{ backgroundColor: task.color ?? "#fff7cc" }}>
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="rounded-full bg-white/75 px-2.5 py-1 text-xs font-extrabold">{priorityLabel[task.priority]}</span>
-                      <div className="flex gap-1">
-                        <button onClick={() => void patchTask(task, { is_pinned: !task.is_pinned }, task.is_pinned ? "Tarea desfijada." : "Tarea fijada.")} className="rounded-lg p-2 hover:bg-white/60" aria-label={task.is_pinned ? "Desfijar tarea" : "Fijar tarea"}>
-                          {task.is_pinned ? <PinOff size={17} /> : <Pin size={17} />}
-                        </button>
-                        <button onClick={() => startEditing(task)} className="rounded-lg p-2 hover:bg-white/60" aria-label={`Editar ${task.title}`}><Pencil size={17} /></button>
-                        <button onClick={() => void removeTask(task)} className="rounded-lg p-2 text-red-700 hover:bg-red-50/70" aria-label={`Eliminar ${task.title}`}><Trash2 size={17} /></button>
-                      </div>
-                    </div>
-                    <h2 className="mt-4 font-display text-lg font-extrabold">{task.title}</h2>
-                    {task.description && <p className="mt-2 line-clamp-3 text-sm text-slate-700">{task.description}</p>}
-                    <div className="mt-5 space-y-2 text-sm">
-                      <p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}>
-                        <CalendarClock size={17} />
-                        {format(new Date(task.deadline), "d MMM yyyy, HH:mm", { locale: es })}
-                        {overdue && " · Vencida"}
-                      </p>
-                      <p>Responsable: <strong>{task.responsible?.full_name ?? "Sin nombre"}</strong></p>
-                    </div>
-                    <label className="mt-5 block border-t border-black/10 pt-4 text-xs font-bold uppercase tracking-wide">
-                      Estado
-                      <select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="mt-2 w-full rounded-lg border border-black/15 bg-white/75 px-3 py-2 text-sm normal-case">
-                        <option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option>
-                      </select>
-                    </label>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        )}
       </div>
+      {total > 12 && <div className="mt-6 flex items-center justify-between"><p className="text-sm text-slate-500">Página {page} de {Math.ceil(total / 12)} · {total} tareas</p><div className="flex gap-2"><button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="rounded-lg border border-slate-300 p-2 disabled:opacity-40" aria-label="Página anterior"><ChevronLeft size={19} /></button><button disabled={page >= Math.ceil(total / 12)} onClick={() => setPage((value) => value + 1)} className="rounded-lg border border-slate-300 p-2 disabled:opacity-40" aria-label="Página siguiente"><ChevronRight size={19} /></button></div></div>}
+
+      <TaskEditorDialog open={editorOpen} onOpenChange={setEditorOpen} task={editing} responsibles={responsibles} onSaved={async (message) => { setNotice(message); await loadTasks(); }} />
+      <TaskPreviewDialog task={preview} onOpenChange={(open) => !open && setPreview(null)} role="manager" onEdit={openEdit} onTogglePin={(task) => void patchTask(task, { is_pinned: !task.is_pinned }, task.is_pinned ? "Tarea desfijada." : "Tarea fijada.")} onDelete={(task) => { setPreview(null); setDeleteTarget(task); }} onStatusChange={(task, status) => void patchTask(task, { status }, "Estado actualizado.")} />
+      <ConfirmDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)} title="Eliminar tarea" description={`Se eliminará permanentemente “${deleteTarget?.title ?? ""}”.`} confirmLabel="Eliminar tarea" onConfirm={async () => { try { await removeTask(); } catch (error) { setServerError(error instanceof Error ? error.message : "No se pudo eliminar la tarea"); } }} />
     </section>
   );
-}
-
-function toLocalDateTime(value: string) {
-  const date = new Date(value);
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-}
-
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-  return <label className="block text-sm font-semibold text-slate-700"><span className="mb-2 block">{label}</span>{children}{error && <span className="mt-1 block text-xs text-red-700">{error}</span>}</label>;
 }

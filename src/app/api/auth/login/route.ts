@@ -4,14 +4,17 @@ import { createSession } from "@/lib/auth/session";
 import { apiError } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { loginSchema } from "@/lib/validators";
+import { protectMutation } from "@/lib/security";
 
 export async function POST(request: Request) {
+  const blocked = protectMutation(request, { scope: "login", limit: 10, windowMs: 10 * 60_000 });
+  if (blocked) return blocked;
   try {
     const input = loginSchema.parse(await request.json());
     const supabase = createAdminClient();
     const { data: user } = await supabase
       .from("users")
-      .select("id, company_id, full_name, email, role, password_hash, is_active")
+      .select("id, company_id, full_name, email, role, password_hash, is_active, must_change_password")
       .eq("email", input.email.toLowerCase())
       .is("deleted_at", null)
       .maybeSingle();
@@ -26,8 +29,9 @@ export async function POST(request: Request) {
       fullName: user.full_name,
       email: user.email,
       role: user.role,
+      mustChangePassword: user.must_change_password,
     });
-    return NextResponse.json({ role: user.role });
+    return NextResponse.json({ role: user.role, mustChangePassword: user.must_change_password });
   } catch (error) {
     return apiError(error);
   }

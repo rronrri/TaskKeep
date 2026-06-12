@@ -2,6 +2,10 @@
 
 Aplicación monolítica con Next.js 16, React 19, TypeScript, Tailwind CSS y Supabase para gestionar empresas, usuarios, tareas, aprobaciones, archivos y recordatorios.
 
+Las tarjetas usan colores predeterminados según su prioridad: verde para baja,
+amarillo para media, naranja para alta y rojo para crítica. Consulta
+`IMPLEMENTATION_REPORT.md` para conocer el estado funcional y los módulos pendientes.
+
 ## Inicio rápido con Docker
 
 El modo recomendado para trabajar con recarga automática es:
@@ -71,6 +75,7 @@ Variables críticas:
 - `GOOGLE_PRIVATE_KEY`: solo servidor.
 - `CRON_SECRET`: protege el endpoint de recordatorios.
 - `APP_URL`: URL HTTPS pública en producción.
+- `COOKIE_SECURE`: usa `false` en HTTP local y `true` detrás de HTTPS. Si se omite, se deduce de `APP_URL`.
 
 ## Base de datos
 

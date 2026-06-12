@@ -41,3 +41,7 @@ export async function POST(request: Request) {
   }
   return NextResponse.json({ processed: tasks?.length ?? 0, sent });
 }
+
+export async function GET(request: Request) {
+  return POST(request);
+}

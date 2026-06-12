@@ -4,6 +4,12 @@ import type { SessionUser } from "@/types";
 
 const cookieName = process.env.COOKIE_NAME ?? "taskkeep_session";
 
+function shouldUseSecureCookie() {
+  if (process.env.COOKIE_SECURE) return process.env.COOKIE_SECURE === "true";
+  if (process.env.APP_URL) return process.env.APP_URL.startsWith("https://");
+  return process.env.NODE_ENV === "production";
+}
+
 function secret() {
   const value = process.env.JWT_SECRET;
   if (!value || value.length < 32) {
@@ -22,7 +28,7 @@ export async function createSession(user: SessionUser) {
   const store = await cookies();
   store.set(cookieName, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookie(),
     sameSite: "strict",
     path: "/",
     maxAge: 60 * 60 * 8,

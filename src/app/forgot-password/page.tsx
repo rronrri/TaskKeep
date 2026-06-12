@@ -1,0 +1,2 @@
+import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
+export default function Page() { return <main className="flex min-h-screen items-center justify-center p-6"><section className="card w-full max-w-md p-7"><p className="text-sm font-bold text-indigo-600">TASKKEEP</p><h1 className="mt-2 font-display text-3xl font-extrabold">Recuperar contraseña</h1><p className="mb-7 mt-2 text-slate-600">Te enviaremos un enlace válido durante 30 minutos.</p><ForgotPasswordForm /></section></main>; }

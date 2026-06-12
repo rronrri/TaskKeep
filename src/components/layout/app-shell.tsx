@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Building2, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, Users } from "lucide-react";
+import { Activity, BellRing, Building2, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, Settings, UserCircle, Users } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 import type { UserRole } from "@/types";
 import { LogoutButton } from "./logout-button";
@@ -11,14 +11,21 @@ export async function AppShell({ role, children }: { role: UserRole; children: R
   const user = await getSession();
   if (!user) redirect("/login");
   if (user.role !== role) redirect(`/${user.role}/dashboard`);
-  const links = [
+  const regularLinks = [
     { href: `/${role}/dashboard`, label: "Resumen", icon: LayoutDashboard },
     ...(role !== "admin" ? [{ href: `/${role}/tasks`, label: "Tareas", icon: ClipboardList }] : []),
     ...(role !== "admin" ? [{ href: `/${role}/calendar`, label: "Calendario", icon: CalendarDays }] : []),
-    ...(role === "manager" ? [{ href: "/manager/status-requests", label: "Solicitudes", icon: ClipboardCheck }] : []),
+    ...(role === "manager" ? [{ href: "/manager/status-requests", label: "Aprobaciones", icon: ClipboardCheck }] : []),
     ...(role === "admin" ? [{ href: "/admin/companies", label: "Empresas", icon: Building2 }] : []),
     ...(role !== "collaborator" ? [{ href: `/${role}/collaborators`, label: "Personas", icon: Users }] : []),
+    ...(role === "admin" ? [{ href: "/admin/logs", label: "Auditoría", icon: Activity }] : []),
+    ...(role === "admin" ? [{ href: "/admin/notifications", label: "Recordatorios", icon: BellRing }] : []),
+    ...(role === "admin" ? [{ href: "/admin/settings", label: "Configuración", icon: Settings }] : []),
+    { href: `/${role}/profile`, label: "Mi perfil", icon: UserCircle },
   ];
+  const links = user.mustChangePassword
+    ? [{ href: `/${role}/profile`, label: "Cambiar contraseña", icon: UserCircle }]
+    : regularLinks;
   return (
     <div className="min-h-screen md:grid md:grid-cols-[250px_1fr]">
       <aside className="border-b border-slate-200 bg-white p-5 md:min-h-screen md:border-b-0 md:border-r">
@@ -36,7 +43,14 @@ export async function AppShell({ role, children }: { role: UserRole; children: R
           <div><p className="font-bold">{user.fullName}</p><p className="text-xs text-slate-500">{labels[user.role]}</p></div>
           <LogoutButton />
         </header>
-        <main className="p-5 md:p-8">{children}</main>
+        <main className="p-5 md:p-8">
+          {user.mustChangePassword && (
+            <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+              Tu cuenta está bloqueada hasta que reemplaces la contraseña temporal.
+            </div>
+          )}
+          {children}
+        </main>
       </div>
     </div>
   );

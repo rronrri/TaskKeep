@@ -20,6 +20,34 @@ async function accessToken() {
   return body.access_token as string;
 }
 
+export function isDriveConfigured() {
+  return Boolean(process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID);
+}
+
+export async function createDriveFolder(name: string, parentId: string) {
+  const token = await accessToken();
+  const response = await fetch("https://www.googleapis.com/drive/v3/files?fields=id,webViewLink", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder", parents: [parentId] }),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error?.message ?? "No se pudo crear la carpeta de Drive");
+  return result as { id: string; webViewLink?: string };
+}
+
+export async function deleteDriveFile(fileId: string) {
+  const token = await accessToken();
+  const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok && response.status !== 404) {
+    const result = await response.json().catch(() => ({}));
+    throw new Error(result.error?.message ?? "No se pudo eliminar el archivo de Drive");
+  }
+}
+
 export async function uploadToDrive(file: File, folderId: string) {
   const token = await accessToken();
   const metadata = { name: file.name, parents: [folderId] };

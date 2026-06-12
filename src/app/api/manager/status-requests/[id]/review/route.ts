@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { reviewStatusSchema } from "@/lib/validators";
+import { writeAudit } from "@/lib/audit";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -19,6 +20,7 @@ export async function POST(request: Request, context: Context) {
       review_comment: input.manager_comment ?? null,
     });
     if (error) throw error;
+    await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: `status_request.${input.decision}`, entityType: "status_request", entityId: id });
     return NextResponse.json({ data });
   } catch (error) {
     return apiError(error);

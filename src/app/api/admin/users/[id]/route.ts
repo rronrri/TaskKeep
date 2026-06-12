@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { updateUserSchema } from "@/lib/validators";
+import { writeAudit } from "@/lib/audit";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -39,6 +40,7 @@ export async function PATCH(request: Request, context: Context) {
       .select("id, company_id, full_name, email, role, is_active, created_at")
       .single();
     if (error) throw error;
+    await writeAudit({ actorId: auth.user.id, companyId: data.company_id, action: "user.updated", entityType: "user", entityId: data.id });
     return NextResponse.json({ data });
   } catch (error) {
     return apiError(error);
@@ -61,8 +63,9 @@ export async function DELETE(_: Request, context: Context) {
   const now = new Date().toISOString();
   const { error } = await supabase
     .from("users")
-    .update({ is_active: false, deleted_at: now, updated_at: now })
+    .update({ is_active: false, updated_at: now })
     .eq("id", target.id);
   if (error) return apiError(error);
+  await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "user.deactivated", entityType: "user", entityId: target.id });
   return NextResponse.json({ ok: true });
 }

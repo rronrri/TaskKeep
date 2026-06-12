@@ -33,7 +33,6 @@ export const taskSchema = z.object({
   deadline: z.string().datetime(),
   priority: z.enum(["low", "medium", "high", "critical"]),
   status: z.enum(["pending", "in_progress", "completed"]).default("pending"),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#fff7cc"),
   is_pinned: z.boolean().default(false),
 });
 
@@ -44,7 +43,6 @@ export const updateTaskSchema = z.object({
   deadline: z.string().datetime().optional(),
   priority: z.enum(["low", "medium", "high", "critical"]).optional(),
   status: z.enum(["pending", "in_progress", "completed"]).optional(),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   is_pinned: z.boolean().optional(),
 });
 
@@ -55,4 +53,20 @@ export const statusRequestSchema = z.object({
 export const reviewStatusSchema = z.object({
   decision: z.enum(["approved", "rejected"]),
   manager_comment: z.string().trim().max(1000).optional(),
+});
+
+export const taskCommentSchema = z.object({
+  comment: z.string().trim().min(1, "Escribe un comentario").max(2000),
+});
+
+export const fileReviewSchema = z.object({
+  decision: z.enum(["approved", "rejected"]),
+  comment: z.string().trim().max(1000).optional(),
+});
+
+export const profileSchema = z.object({
+  full_name: z.string().trim().min(2, "Ingresa tu nombre completo").max(120),
+  email: z.string().email("Ingresa un correo válido").max(254),
+  current_password: z.string().max(128),
+  new_password: z.union([z.string().min(8, "Usa al menos 8 caracteres").max(128), z.literal("")]),
 });
