@@ -11,7 +11,7 @@ interface UpcomingTask {
   title: string;
   status: TaskStatus;
   priority: TaskPriority;
-  deadline: string;
+  deadline: string | null;
   responsible?: { full_name: string } | null;
 }
 
@@ -46,8 +46,8 @@ export function Overview({ role }: { role: UserRole }) {
     ? [
         { label: "Empresas", value: data?.metrics.companies, icon: Building2, color: "text-indigo-700 bg-indigo-50" },
         { label: "Empresas activas", value: data?.metrics.activeCompanies, icon: CheckCircle2, color: "text-emerald-700 bg-emerald-50" },
-        { label: "Gestoras", value: data?.metrics.managers, icon: UserRoundCog, color: "text-violet-700 bg-violet-50" },
-        { label: "Colaboradoras", value: data?.metrics.collaborators, icon: Users, color: "text-blue-700 bg-blue-50" },
+        { label: "Gestores/as", value: data?.metrics.managers, icon: UserRoundCog, color: "text-violet-700 bg-violet-50" },
+        { label: "Colaboradores/as", value: data?.metrics.collaborators, icon: Users, color: "text-blue-700 bg-blue-50" },
       ]
     : [
         { label: "Pendientes", value: data?.metrics.pending, icon: CircleDashed, color: "text-amber-700 bg-amber-50" },
@@ -79,7 +79,7 @@ export function Overview({ role }: { role: UserRole }) {
             {data?.recent?.length ? data.recent.map((person) => (
               <div key={person.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm">
                 <div><p className="font-bold">{person.full_name}</p><p className="text-slate-500">{person.email}</p></div>
-                <div className="text-right"><p className="font-semibold">{person.role === "manager" ? "Gestora" : "Colaboradora"}</p><p className="text-xs text-slate-500">{companyName(person.company)}</p></div>
+                <div className="text-right"><p className="font-semibold">{person.role === "manager" ? "Gestor/a" : "Colaborador/a"}</p><p className="text-xs text-slate-500">{companyName(person.company)}</p></div>
               </div>
             )) : <p className="p-6 text-sm text-slate-500">Todavía no hay personas registradas.</p>}
           </div>
@@ -93,7 +93,7 @@ export function Overview({ role }: { role: UserRole }) {
                 const style = priorityStyles[task.priority];
                 return <Link href={`/${role}/tasks?task=${task.id}`} key={task.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 hover:bg-slate-50">
                   <div><p className="font-bold">{task.title}</p><p className="mt-1 text-xs text-slate-500">{task.responsible?.full_name ?? "Responsable asignado"}</p></div>
-                  <div className="text-right"><span className={`rounded-full px-2 py-1 text-xs font-bold ${style.badge}`}>{style.label}</span><p className="mt-2 text-xs text-slate-500">{new Date(task.deadline).toLocaleString("es-EC", { dateStyle: "medium", timeStyle: "short" })}</p></div>
+                  <div className="text-right"><span className={`rounded-full px-2 py-1 text-xs font-bold ${style.badge}`}>{style.label}</span><p className="mt-2 text-xs text-slate-500">{task.deadline ? new Date(task.deadline).toLocaleString("es-EC", { dateStyle: "medium", timeStyle: "short" }) : "Sin fecha límite"}</p></div>
                 </Link>;
               }) : <p className="p-6 text-sm text-slate-500">No hay tareas pendientes.</p>}
             </div>

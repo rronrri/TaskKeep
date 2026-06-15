@@ -5,13 +5,15 @@ import { createSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/server";
 import { profileSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
+import { parseDriveFolderLink } from "@/lib/google-drive/oauth";
+import { verifyDriveFolder } from "@/lib/google-drive";
 
 export async function GET() {
   const auth = await requireApiUser(undefined, { allowTemporaryPassword: true });
   if (auth.error) return auth.error;
   const { data, error } = await createAdminClient()
     .from("users")
-    .select("id,full_name,email,role,created_at,must_change_password,company:companies(name)")
+    .select("id,full_name,email,role,created_at,must_change_password,google_email,google_connected_at,company:companies!users_company_id_fkey(name,drive_folder_url,drive_folder_id,drive_connected_at)")
     .eq("id", auth.user.id)
     .single();
   if (error) return apiError(error);
@@ -38,6 +40,35 @@ export async function PATCH(request: Request) {
         },
         { status: 400 },
       );
+    }
+    if (auth.user.role === "manager" && input.drive_folder_url !== undefined) {
+      if (!input.drive_folder_url) {
+        await supabase.from("companies").update({
+          drive_folder_id: null,
+          drive_folder_url: null,
+          drive_owner_user_id: null,
+          drive_connected_at: null,
+        }).eq("id", auth.user.companyId!);
+      } else {
+        const folderId = parseDriveFolderLink(input.drive_folder_url);
+        if (!folderId) {
+          return NextResponse.json({ error: "No se pudo reconocer el enlace de la carpeta de Google Drive" }, { status: 400 });
+        }
+        try {
+          await verifyDriveFolder(folderId, auth.user.id);
+        } catch (error) {
+          return NextResponse.json(
+            { error: error instanceof Error ? error.message : "No se pudo validar la carpeta de Google Drive" },
+            { status: 400 },
+          );
+        }
+        await supabase.from("companies").update({
+          drive_folder_id: folderId,
+          drive_folder_url: input.drive_folder_url,
+          drive_owner_user_id: auth.user.id,
+          drive_connected_at: new Date().toISOString(),
+        }).eq("id", auth.user.companyId!);
+      }
     }
     if (input.new_password) {
       if (!input.current_password || !(await bcrypt.compare(input.current_password, current.password_hash))) {

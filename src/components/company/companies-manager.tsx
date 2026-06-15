@@ -128,7 +128,7 @@ export function CompaniesManager() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[680px] text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr><th className="px-5 py-4">Empresa</th><th className="px-5 py-4">Gestores</th><th className="px-5 py-4">Colaboradores</th><th className="px-5 py-4">Creada</th><th className="px-5 py-4 text-right">Acciones</th></tr>
+                <tr><th className="px-5 py-4">Empresa</th><th className="px-5 py-4">Gestores/as</th><th className="px-5 py-4">Colaboradores/as</th><th className="px-5 py-4">Creada</th><th className="px-5 py-4 text-right">Acciones</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {companies.map((company) => (
@@ -154,8 +154,8 @@ export function CompaniesManager() {
           <Field label="Nombre" error={errors.name?.message}><input {...register("name")} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" /></Field>
           <Field label="Descripción" error={errors.description?.message}><textarea {...register("description")} rows={3} className="w-full resize-y rounded-xl border border-slate-300 px-3 py-2.5" /></Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Máx. gestores" error={errors.max_managers?.message}><input type="number" min={1} max={100} {...register("max_managers", { valueAsNumber: true })} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" /></Field>
-            <Field label="Máx. colaboradores" error={errors.max_collaborators?.message}><input type="number" min={1} max={10000} {...register("max_collaborators", { valueAsNumber: true })} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" /></Field>
+            <Field label="Máx. gestores/as" error={errors.max_managers?.message}><input type="number" min={1} max={100} {...register("max_managers", { valueAsNumber: true })} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" /></Field>
+            <Field label="Máx. colaboradores/as" error={errors.max_collaborators?.message}><input type="number" min={1} max={10000} {...register("max_collaborators", { valueAsNumber: true })} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" /></Field>
           </div>
           {errors.root?.message && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{errors.root.message}</p>}
           <div className="flex justify-end gap-3 pt-2">

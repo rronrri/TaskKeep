@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const size = 20;
   let query = createAdminClient()
     .from("audit_logs")
-    .select("id,action,entity_type,entity_id,metadata,created_at,actor:users(full_name,email),company:companies(name)", { count: "exact" });
+    .select("id,action,entity_type,entity_id,metadata,created_at,actor:users(full_name,email),company:companies!audit_logs_company_id_fkey(name)", { count: "exact" });
   const action = url.searchParams.get("action");
   if (action) query = query.eq("action", action);
   const { data, count, error } = await query.order("created_at", { ascending: false }).range((page - 1) * size, page * size - 1);

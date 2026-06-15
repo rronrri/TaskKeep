@@ -26,24 +26,36 @@ export const updateUserSchema = z.object({
   password: z.union([z.string().min(8).max(128), z.literal("")]).optional(),
 });
 
+const reminderModeSchema = z.enum(["none", "daily", "monthly", "deadline"]);
+
 export const taskSchema = z.object({
   title: z.string().trim().min(2).max(160),
   description: z.string().trim().max(5000).optional().nullable(),
   responsible_id: z.string().uuid(),
-  deadline: z.string().datetime(),
+  deadline: z.string().datetime().nullable().optional(),
   priority: z.enum(["low", "medium", "high", "critical"]),
   status: z.enum(["pending", "in_progress", "completed"]).default("pending"),
   is_pinned: z.boolean().default(false),
+  reminder_mode: reminderModeSchema.default("none"),
+}).superRefine((value, context) => {
+  if (value.reminder_mode === "deadline" && !value.deadline) {
+    context.addIssue({ code: "custom", path: ["deadline"], message: "Selecciona una fecha límite" });
+  }
 });
 
 export const updateTaskSchema = z.object({
   title: z.string().trim().min(2).max(160).optional(),
   description: z.string().trim().max(5000).nullable().optional(),
   responsible_id: z.string().uuid().optional(),
-  deadline: z.string().datetime().optional(),
+  deadline: z.string().datetime().nullable().optional(),
   priority: z.enum(["low", "medium", "high", "critical"]).optional(),
   status: z.enum(["pending", "in_progress", "completed"]).optional(),
   is_pinned: z.boolean().optional(),
+  reminder_mode: reminderModeSchema.optional(),
+}).superRefine((value, context) => {
+  if (value.reminder_mode === "deadline" && !value.deadline) {
+    context.addIssue({ code: "custom", path: ["deadline"], message: "Selecciona una fecha límite" });
+  }
 });
 
 export const statusRequestSchema = z.object({
@@ -62,6 +74,7 @@ export const taskCommentSchema = z.object({
 export const fileReviewSchema = z.object({
   decision: z.enum(["approved", "rejected"]),
   comment: z.string().trim().max(1000).optional(),
+  drive_folder_id: z.string().trim().min(1).optional(),
 });
 
 export const profileSchema = z.object({
@@ -69,4 +82,5 @@ export const profileSchema = z.object({
   email: z.string().email("Ingresa un correo válido").max(254),
   current_password: z.string().max(128),
   new_password: z.union([z.string().min(8, "Usa al menos 8 caracteres").max(128), z.literal("")]),
+  drive_folder_url: z.union([z.string().url("Ingresa un enlace válido de Google Drive"), z.literal("")]).optional(),
 });

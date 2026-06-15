@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Pencil, Plus, Power, RotateCcw, Search, UserRound } from "lucide-react";
+import { Pencil, Plus, Search, Trash2, UserRound } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -18,7 +18,7 @@ const formSchema = z.object({
 });
 
 type PersonInput = z.infer<typeof formSchema>;
-interface Person { id: string; company_id: string; full_name: string; email: string; role: "manager" | "collaborator"; is_active: boolean; created_at: string; company?: { name: string } | { name: string }[] | null; }
+interface Person { id: string; company_id: string; full_name: string; email: string; role: "manager" | "collaborator"; created_at: string; company?: { name: string } | { name: string }[] | null; }
 interface Company { id: string; name: string; }
 interface Session { id: string; companyId: string | null; role: "admin" | "manager" | "collaborator"; }
 
@@ -29,14 +29,13 @@ export function PeopleManager({ mode }: { mode: "admin" | "manager" }) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [session, setSession] = useState<Session | null>(null);
   const [editing, setEditing] = useState<Person | null>(null);
-  const [deactivateTarget, setDeactivateTarget] = useState<Person | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [serverError, setServerError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
-  const [activeFilter, setActiveFilter] = useState("");
   const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } =
     useForm<PersonInput>({ resolver: zodResolver(formSchema), defaultValues: emptyValues });
 
@@ -60,32 +59,16 @@ export function PeopleManager({ mode }: { mode: "admin" | "manager" }) {
   }, [mode]);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/admin/users", { cache: "no-store" }),
-      fetch("/api/auth/me", { cache: "no-store" }),
-      mode === "admin" ? fetch("/api/admin/companies", { cache: "no-store" }) : Promise.resolve(null),
-    ])
-      .then(async ([peopleResponse, meResponse, companiesResponse]) => {
-        const peopleBody = await peopleResponse.json();
-        const meBody = await meResponse.json();
-        if (!peopleResponse.ok) throw new Error(peopleBody.error ?? "No se pudieron cargar las personas");
-        if (!meResponse.ok) throw new Error(meBody.error ?? "No se pudo cargar la sesión");
-        setPeople(peopleBody.data ?? []);
-        setSession(meBody.user);
-        if (companiesResponse) {
-          const companiesBody = await companiesResponse.json();
-          if (!companiesResponse.ok) throw new Error(companiesBody.error ?? "No se pudieron cargar las empresas");
-          setCompanies(companiesBody.data ?? []);
-        }
-      })
+    // Initial synchronization with the API.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load()
       .catch((error: unknown) => setServerError(error instanceof Error ? error.message : "No se pudieron cargar los datos"))
       .finally(() => setLoading(false));
-  }, [mode]);
+  }, [load]);
 
   const baseValues = useCallback((): PersonInput => ({
     ...emptyValues,
     company_id: mode === "manager" ? session?.companyId ?? "" : "",
-    role: "collaborator",
   }), [mode, session?.companyId]);
 
   const openCreate = () => {
@@ -125,31 +108,18 @@ export function PeopleManager({ mode }: { mode: "admin" | "manager" }) {
     await load();
   };
 
-  const deactivate = async () => {
-    if (!deactivateTarget) return;
-    const response = await fetch(`/api/admin/users/${deactivateTarget.id}`, { method: "DELETE" });
+  const remove = async () => {
+    if (!deleteTarget) return;
+    const response = await fetch(`/api/admin/users/${deleteTarget.id}`, { method: "DELETE" });
     const body = await response.json();
-    if (!response.ok) throw new Error(body.error ?? "No se pudo desactivar la cuenta");
-    setNotice("Cuenta desactivada correctamente.");
-    await load();
-  };
-
-  const reactivate = async (person: Person) => {
-    const response = await fetch(`/api/admin/users/${person.id}/activate`, { method: "POST" });
-    const body = await response.json();
-    if (!response.ok) {
-      setServerError(body.error ?? "No se pudo reactivar la cuenta");
-      return;
-    }
-    setNotice("Cuenta reactivada correctamente.");
+    if (!response.ok) throw new Error(body.error ?? "No se pudo eliminar la cuenta");
+    setNotice("Cuenta eliminada definitivamente.");
     await load();
   };
 
   const visiblePeople = people.filter((person) => {
     const matchesSearch = !search.trim() || `${person.full_name} ${person.email}`.toLowerCase().includes(search.toLowerCase());
-    const matchesRole = !roleFilter || person.role === roleFilter;
-    const matchesActive = !activeFilter || String(person.is_active) === activeFilter;
-    return matchesSearch && matchesRole && matchesActive;
+    return matchesSearch && (!roleFilter || person.role === roleFilter);
   });
 
   return (
@@ -157,8 +127,8 @@ export function PeopleManager({ mode }: { mode: "admin" | "manager" }) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-bold text-indigo-600">EQUIPO</p>
-          <h1 className="font-display text-3xl font-extrabold">{mode === "admin" ? "Personas" : "Colaboradores"}</h1>
-          <p className="mt-2 text-slate-600">{mode === "admin" ? "Crea gestoras y colaboradoras, y asígnalas a una empresa." : "Crea y administra las colaboradoras de tu empresa."}</p>
+          <h1 className="font-display text-3xl font-extrabold">{mode === "admin" ? "Personas" : "Colaboradores/as"}</h1>
+          <p className="mt-2 text-slate-600">{mode === "admin" ? "Crea gestores/as y colaboradores/as, y asígnalos/as a una empresa." : "Crea y administra colaboradores/as de tu empresa."}</p>
         </div>
         <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white hover:bg-indigo-700"><Plus size={19} /> Nueva cuenta</button>
       </div>
@@ -167,12 +137,11 @@ export function PeopleManager({ mode }: { mode: "admin" | "manager" }) {
       {notice && <p role="status" className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{notice}</p>}
       <div className="mt-6 flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-3">
         <div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-2.5 text-slate-400" size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nombre o correo…" className="w-full rounded-lg border border-slate-300 py-2 pl-10 pr-3 text-sm" /></div>
-        {mode === "admin" && <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option value="">Todos los roles</option><option value="manager">Gestoras</option><option value="collaborator">Colaboradoras</option></select>}
-        <select value={activeFilter} onChange={(event) => setActiveFilter(event.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option value="">Todos los estados</option><option value="true">Activas</option><option value="false">Desactivadas</option></select>
+        {mode === "admin" && <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option value="">Todos los roles</option><option value="manager">Gestores/as</option><option value="collaborator">Colaboradores/as</option></select>}
       </div>
       <div className="card mt-7 overflow-hidden">
-        {loading ? <p className="p-8 text-center text-slate-500">Cargando personas...</p> : people.length === 0 ? (
-          <div className="p-10 text-center"><UserRound className="mx-auto text-slate-300" size={38} /><p className="mt-4 font-bold">No hay cuentas todavía.</p><button onClick={openCreate} className="mt-3 font-bold text-indigo-700">Crear la primera cuenta</button></div>
+        {loading ? <p className="p-8 text-center text-slate-500">Cargando personas...</p> : visiblePeople.length === 0 ? (
+          <div className="p-10 text-center"><UserRound className="mx-auto text-slate-300" size={38} /><p className="mt-4 font-bold">No hay cuentas para mostrar.</p></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
@@ -180,13 +149,13 @@ export function PeopleManager({ mode }: { mode: "admin" | "manager" }) {
               <tbody className="divide-y divide-slate-200">
                 {visiblePeople.map((person) => (
                   <tr key={person.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-4"><p className="font-bold">{person.full_name}</p><p className="text-xs text-slate-500">{person.email}</p>{!person.is_active && <span className="mt-1 inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-700">Desactivada</span>}</td>
+                    <td className="px-5 py-4"><p className="font-bold">{person.full_name}</p><p className="text-xs text-slate-500">{person.email}</p></td>
                     <td className="px-5 py-4">{companyName(person.company)}</td>
-                    <td className="px-5 py-4"><span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">{person.role === "manager" ? "Gestora" : "Colaboradora"}</span></td>
+                    <td className="px-5 py-4"><span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">{person.role === "manager" ? "Gestor/a" : "Colaborador/a"}</span></td>
                     <td className="px-5 py-4 text-slate-600">{new Date(person.created_at).toLocaleDateString("es-EC")}</td>
                     <td className="px-5 py-4"><div className="flex justify-end gap-2">
                       <button onClick={() => openEdit(person)} className="rounded-lg border border-slate-300 p-2 hover:bg-slate-100" aria-label={`Editar ${person.full_name}`}><Pencil size={17} /></button>
-                      {person.is_active ? <button onClick={() => setDeactivateTarget(person)} className="rounded-lg border border-red-200 p-2 text-red-700 hover:bg-red-50" aria-label={`Desactivar ${person.full_name}`}><Power size={17} /></button> : <button onClick={() => void reactivate(person)} className="rounded-lg border border-emerald-200 p-2 text-emerald-700 hover:bg-emerald-50" aria-label={`Reactivar ${person.full_name}`}><RotateCcw size={17} /></button>}
+                      <button onClick={() => setDeleteTarget(person)} className="rounded-lg border border-red-200 p-2 text-red-700 hover:bg-red-50" aria-label={`Eliminar ${person.full_name}`}><Trash2 size={17} /></button>
                     </div></td>
                   </tr>
                 ))}
@@ -203,7 +172,7 @@ export function PeopleManager({ mode }: { mode: "admin" | "manager" }) {
           <Field label={editing ? "Nueva contraseña" : "Contraseña temporal"} error={errors.password?.message}><input type="password" {...register("password")} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" placeholder={editing ? "Déjala vacía para conservarla" : "Mínimo 8 caracteres"} /></Field>
           {!editing && mode === "admin" && <>
             <Field label="Empresa" error={errors.company_id?.message}><select {...register("company_id")} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"><option value="">Selecciona una empresa</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select></Field>
-            <Field label="Rol" error={errors.role?.message}><select {...register("role")} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"><option value="manager">Gestora</option><option value="collaborator">Colaboradora</option></select></Field>
+            <Field label="Rol" error={errors.role?.message}><select {...register("role")} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"><option value="manager">Gestor/a</option><option value="collaborator">Colaborador/a</option></select></Field>
           </>}
           {errors.root?.message && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{errors.root.message}</p>}
           <div className="flex justify-end gap-3 pt-2">
@@ -214,14 +183,15 @@ export function PeopleManager({ mode }: { mode: "admin" | "manager" }) {
       </AppDialog>
 
       <ConfirmDialog
-        open={Boolean(deactivateTarget)}
-        onOpenChange={(open) => !open && setDeactivateTarget(null)}
-        title="Desactivar cuenta"
-        description={`La cuenta de ${deactivateTarget?.full_name ?? "esta persona"} ya no podrá acceder al sistema.`}
-        confirmLabel="Desactivar"
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Eliminar cuenta definitivamente"
+        description={`Se eliminará la cuenta de ${deleteTarget?.full_name ?? "esta persona"} y sus tareas relacionadas. Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar cuenta"
+        requiredText={deleteTarget?.email}
         onConfirm={async () => {
-          try { await deactivate(); }
-          catch (error) { setServerError(error instanceof Error ? error.message : "No se pudo desactivar la cuenta"); }
+          try { await remove(); }
+          catch (error) { setServerError(error instanceof Error ? error.message : "No se pudo eliminar la cuenta"); }
         }}
       />
     </section>

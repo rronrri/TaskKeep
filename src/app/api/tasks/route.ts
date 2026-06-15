@@ -3,7 +3,8 @@ import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { taskSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
-import { createDriveFolder, isDriveConfigured } from "@/lib/google-drive";
+import { reminderFields } from "@/lib/tasks/reminders";
+import { createDriveFolder } from "@/lib/google-drive";
 
 export async function GET(request: Request) {
   const auth = await requireApiUser();
@@ -41,17 +42,20 @@ export async function GET(request: Request) {
   const ordering = sortOptions[sort] ?? sortOptions.deadline_asc;
   const { data, count, error } = await query
     .order("is_pinned", { ascending: false })
-    .order(ordering.column, { ascending: ordering.ascending })
+    .order(ordering.column, { ascending: ordering.ascending, nullsFirst: false })
     .range((page - 1) * size, page * size - 1);
   if (error) return apiError(error);
   return NextResponse.json({ data, pagination: { page, size, total: count ?? 0 } });
 }
 
 export async function POST(request: Request) {
-  const auth = await requireApiUser(["manager"]);
+  const auth = await requireApiUser(["manager", "collaborator"]);
   if (auth.error) return auth.error;
   try {
-    const input = taskSchema.parse(await request.json());
+    const raw = await request.json();
+    const input = taskSchema.parse(auth.user.role === "collaborator"
+      ? { ...raw, responsible_id: auth.user.id, status: "pending", is_pinned: false }
+      : raw);
     const supabase = createAdminClient();
     const { data: responsible } = await supabase
       .from("users")
@@ -62,26 +66,34 @@ export async function POST(request: Request) {
       .is("deleted_at", null)
       .maybeSingle();
     if (!responsible) return NextResponse.json({ error: "Responsable no válido" }, { status: 400 });
-    let driveFolderId: string | null = null;
-    if (isDriveConfigured()) {
-      const { data: company } = await supabase.from("companies").select("name,drive_folder_id").eq("id", auth.user.companyId!).single();
-      let parentId = company?.drive_folder_id;
-      if (!parentId && company) {
-        const companyFolder = await createDriveFolder(company.name, process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID!);
-        parentId = companyFolder.id;
-        await supabase.from("companies").update({ drive_folder_id: parentId }).eq("id", auth.user.companyId!);
-      }
-      if (parentId) driveFolderId = (await createDriveFolder(input.title, parentId)).id;
-    }
+    const reminder = reminderFields(input.reminder_mode, input.deadline);
     const { data, error } = await supabase
       .from("tasks")
-      .insert({ ...input, company_id: auth.user.companyId, created_by: auth.user.id, drive_folder_id: driveFolderId })
+      .insert({ ...input, ...reminder, company_id: auth.user.companyId, created_by: auth.user.id })
       .select()
       .single();
     if (error) throw error;
+    const { data: company } = await supabase
+      .from("companies")
+      .select("drive_folder_id,drive_owner_user_id")
+      .eq("id", auth.user.companyId!)
+      .maybeSingle();
+    if (company?.drive_folder_id && company.drive_owner_user_id) {
+      try {
+        const taskFolder = await createDriveFolder(taskFolderName(data.id, data.title), company.drive_folder_id, company.drive_owner_user_id);
+        await supabase.from("tasks").update({ drive_folder_id: taskFolder.id }).eq("id", data.id);
+        data.drive_folder_id = taskFolder.id;
+      } catch (driveError) {
+        console.error("No se pudo crear la carpeta de la tarea", driveError);
+      }
+    }
     await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.created", entityType: "task", entityId: data.id, metadata: { title: data.title } });
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) {
     return apiError(error);
   }
+}
+
+function taskFolderName(id: string, title: string) {
+  return `TK-${id.slice(0, 8)} - ${title}`.slice(0, 120);
 }

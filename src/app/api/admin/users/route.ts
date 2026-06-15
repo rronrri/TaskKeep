@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
   let query = supabase
     .from("users")
-    .select("id, company_id, full_name, email, role, is_active, created_at, company:companies(name)")
+    .select("id, company_id, full_name, email, role, is_active, created_at, company:companies!users_company_id_fkey(name)")
     .neq("role", "admin")
     .is("deleted_at", null)
     .order("created_at", { ascending: false });

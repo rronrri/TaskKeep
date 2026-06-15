@@ -57,14 +57,14 @@ export function TaskCalendar() {
       .catch((error: unknown) => setServerError(error instanceof Error ? error.message : "No se pudo cargar el calendario"));
   }, []);
 
-  const events = useMemo(() => tasks.map((task) => ({
+  const events = useMemo(() => tasks.filter((task) => task.deadline).map((task) => ({
     id: task.id,
     title: task.title,
-    date: task.deadline.slice(0, 10),
+    date: task.deadline!.slice(0, 10),
     color: priorityStyles[task.priority].calendar,
   })), [tasks]);
 
-  const selectedTasks = useMemo(() => tasks.filter((task) => task.deadline.slice(0, 10) === selectedDate), [selectedDate, tasks]);
+  const selectedTasks = useMemo(() => tasks.filter((task) => task.deadline?.slice(0, 10) === selectedDate), [selectedDate, tasks]);
 
   const patchTask = async (task: Task, values: Partial<Pick<Task, "is_pinned" | "status">>, message: string) => {
     const response = await fetch(`/api/tasks/${task.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
@@ -130,7 +130,7 @@ export function TaskCalendar() {
               return (
                 <button key={task.id} onClick={() => setPreview(task)} className={`w-full rounded-xl border p-3 text-left hover:shadow-sm ${priority.card}`}>
                   <div className="flex items-start justify-between gap-2"><p className="font-bold">{task.title}</p>{task.is_pinned && <Pin size={15} />}</div>
-                  <p className="mt-1 text-xs text-slate-600">{new Date(task.deadline).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" })} · {task.responsible?.full_name ?? "Responsable"}</p>
+                  <p className="mt-1 text-xs text-slate-600">{new Date(task.deadline!).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" })} · {task.responsible?.full_name ?? "Responsable"}</p>
                 </button>
               );
             })}

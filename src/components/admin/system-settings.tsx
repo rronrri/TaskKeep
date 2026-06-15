@@ -20,7 +20,7 @@ export function SystemSettings() {
   const items = [
     { label: "Base de datos Supabase", ready: status?.database, icon: Database, detail: "Persistencia principal y políticas de datos." },
     { label: "Correo con Resend", ready: status?.email, icon: Mail, detail: "Bienvenidas, recuperación y recordatorios." },
-    { label: "Archivos en Google Drive", ready: status?.drive, icon: HardDrive, detail: "Requiere cuenta de servicio, clave privada y carpeta raíz." },
+    { label: "Google Drive", ready: status?.drive, icon: HardDrive, detail: "OAuth configurado. Cada gestor/a conecta su cuenta y carpeta raíz." },
     { label: "Programador de recordatorios", ready: status?.cron, icon: Timer, detail: "Protegido mediante CRON_SECRET y configurado para Vercel." },
     { label: "Cookie segura", ready: status?.cookieSecure, icon: ShieldCheck, detail: "Debe estar activa cuando APP_URL usa HTTPS." },
   ];

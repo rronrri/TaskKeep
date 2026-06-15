@@ -52,7 +52,7 @@ export async function DELETE(_: Request, context: Context) {
   if (auth.error) return auth.error;
   const { id } = await context.params;
   const supabase = createAdminClient();
-  let query = supabase.from("users").select("id").eq("id", id).is("deleted_at", null);
+  let query = supabase.from("users").select("id,company_id,full_name,email,role").eq("id", id).is("deleted_at", null);
   if (auth.user.role === "manager") {
     query = query.eq("company_id", auth.user.companyId!).eq("role", "collaborator");
   } else {
@@ -60,12 +60,30 @@ export async function DELETE(_: Request, context: Context) {
   }
   const { data: target } = await query.maybeSingle();
   if (!target) return NextResponse.json({ error: "Usuario no encontrado o no permitido" }, { status: 404 });
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("users")
-    .update({ is_active: false, updated_at: now })
-    .eq("id", target.id);
+  if (target.role === "collaborator") {
+    const { count, error: taskError } = await supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("responsible_id", target.id)
+      .is("deleted_at", null);
+    if (taskError) return apiError(taskError);
+    if ((count ?? 0) > 0) {
+      return NextResponse.json(
+        { error: "No se puede eliminar al colaborador/a mientras tenga tareas asignadas. Reasigna o elimina esas tareas primero." },
+        { status: 409 },
+      );
+    }
+  }
+  const { data: deleted, error } = await supabase.rpc("delete_user_cascade", { target_user_id: target.id });
   if (error) return apiError(error);
-  await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "user.deactivated", entityType: "user", entityId: target.id });
-  return NextResponse.json({ ok: true });
+  if (!deleted) return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+  await writeAudit({
+    actorId: auth.user.id,
+    companyId: target.company_id,
+    action: "user.deleted",
+    entityType: "user",
+    entityId: target.id,
+    metadata: { fullName: target.full_name, email: target.email },
+  });
+  return NextResponse.json({ ok: true, deleted: true });
 }

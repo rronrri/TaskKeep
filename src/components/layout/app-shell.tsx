@@ -5,7 +5,7 @@ import { getSession } from "@/lib/auth/session";
 import type { UserRole } from "@/types";
 import { LogoutButton } from "./logout-button";
 
-const labels: Record<UserRole, string> = { admin: "Administrador", manager: "Gestor", collaborator: "Colaborador" };
+const labels: Record<UserRole, string> = { admin: "Administrador/a", manager: "Gestor/a", collaborator: "Colaborador/a" };
 
 export async function AppShell({ role, children }: { role: UserRole; children: React.ReactNode }) {
   const user = await getSession();

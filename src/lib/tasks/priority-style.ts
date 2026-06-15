@@ -12,9 +12,9 @@ export const priorityStyles: Record<
   },
   medium: {
     label: "Media",
-    card: "border-amber-200 bg-amber-50",
-    badge: "bg-amber-100 text-amber-800",
-    calendar: "#d97706",
+    card: "border-sky-200 bg-sky-50",
+    badge: "bg-sky-100 text-sky-800",
+    calendar: "#0284c7",
   },
   high: {
     label: "Alta",

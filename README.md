@@ -72,7 +72,6 @@ Variables críticas:
 - `SUPABASE_SERVICE_ROLE_KEY`: solo servidor.
 - `POSTGRES_PASSWORD` y URLs PostgreSQL: solo servidor.
 - `RESEND_API_KEY`: solo servidor.
-- `GOOGLE_PRIVATE_KEY`: solo servidor.
 - `CRON_SECRET`: protege el endpoint de recordatorios.
 - `APP_URL`: URL HTTPS pública en producción.
 - `COOKIE_SECURE`: usa `false` en HTTP local y `true` detrás de HTTPS. Si se omite, se deduce de `APP_URL`.
@@ -103,6 +102,29 @@ Authorization: Bearer <CRON_SECRET>
 
 Puede utilizarse Vercel Cron, GitHub Actions, cron-job.org, Supabase Scheduled Functions o el planificador de la plataforma donde se ejecute el contenedor.
 
+Solo se procesan tareas con recordatorios habilitados. Cada tarea puede usar avisos diarios, mensuales o avisos 5, 3 y 1 día antes de su fecha límite. Cuando un/a gestor/a asigna una tarea a un/a colaborador/a, ambos reciben el aviso.
+
+## Google Drive
+
+Google Drive funciona por empresa:
+
+1. El/la gestor/a conecta su cuenta desde **Mi perfil**.
+2. Pega el enlace de una carpeta raíz de Drive.
+3. TaskKeep valida el acceso y guarda esa carpeta en la empresa.
+4. Los colaboradores/as heredan esa carpeta automáticamente.
+5. Cada tarea crea una carpeta propia `TK-... - nombre de tarea`.
+6. Los archivos de colaboradores/as se suben a `Pendientes` y luego el/la gestor/a los aprueba o rechaza.
+7. Al aprobar, el archivo se mueve a la carpeta principal de la tarea o a una subcarpeta elegida.
+
+Variables necesarias:
+
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_SECRET`
+- `NEXT_PUBLIC_GOOGLE_API_KEY`
+- `NEXT_PUBLIC_GOOGLE_APP_ID`
+
+En producción agrega el dominio HTTPS y `/api/google/callback` en los orígenes y redirects autorizados de Google Cloud.
+
 ## Producción
 
 La imagen es portable a cualquier servicio compatible con contenedores. En producción:
@@ -112,7 +134,7 @@ La imagen es portable a cualquier servicio compatible con contenedores. En produ
 3. Coloca el servicio detrás de HTTPS mediante un balanceador o proxy inverso.
 4. Expón únicamente el puerto HTTP de la aplicación.
 5. Usa `/api/health` para probes de vida.
-6. Conserva Supabase y Google Drive como servicios externos; el contenedor es efímero.
+6. Conserva Supabase como servicio externo; el contenedor es efímero.
 7. Centraliza logs y configura reinicios automáticos.
 8. Ejecuta las migraciones como una tarea separada antes de desplegar una versión que las requiera.
 

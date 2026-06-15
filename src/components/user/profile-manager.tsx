@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, Save, ShieldAlert, UserRound } from "lucide-react";
+import { ExternalLink, FolderOpen, KeyRound, Save, ShieldAlert, UserRound } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
@@ -14,7 +14,9 @@ type ProfileMeta = {
   role: "admin" | "manager" | "collaborator";
   created_at: string;
   must_change_password: boolean;
-  company?: { name: string } | { name: string }[] | null;
+  google_email?: string | null;
+  google_connected_at?: string | null;
+  company?: { name: string; drive_folder_url?: string | null; drive_folder_id?: string | null; drive_connected_at?: string | null } | Array<{ name: string; drive_folder_url?: string | null; drive_folder_id?: string | null; drive_connected_at?: string | null }> | null;
 };
 
 export function ProfileManager() {
@@ -25,7 +27,7 @@ export function ProfileManager() {
   const [meta, setMeta] = useState<ProfileMeta | null>(null);
   const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } = useForm<ProfileInput>({
     resolver: zodResolver(profileSchema),
-    defaultValues: { full_name: "", email: "", current_password: "", new_password: "" },
+    defaultValues: { full_name: "", email: "", current_password: "", new_password: "", drive_folder_url: "" },
   });
 
   useEffect(() => {
@@ -33,8 +35,12 @@ export function ProfileManager() {
       .then(async (response) => {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? "No se pudo cargar el perfil");
-        reset({ full_name: body.data.full_name, email: body.data.email, current_password: "", new_password: "" });
+        const company = Array.isArray(body.data.company) ? body.data.company[0] : body.data.company;
+        reset({ full_name: body.data.full_name, email: body.data.email, current_password: "", new_password: "", drive_folder_url: company?.drive_folder_url ?? "" });
         setMeta(body.data);
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("google") === "connected") setNotice("Google Drive conectado. Ahora puedes pegar el enlace de la carpeta raíz.");
+        if (params.get("google") === "error") setServerError(params.get("reason") ?? "No se pudo conectar Google Drive.");
       })
       .catch((reason: unknown) => setServerError(reason instanceof Error ? reason.message : "No se pudo cargar el perfil"));
   }, [reset]);
@@ -68,7 +74,7 @@ export function ProfileManager() {
     }
 
     const wasTemporary = meta?.must_change_password;
-    reset({ full_name: body.data.full_name, email: body.data.email, current_password: "", new_password: "" });
+    reset({ full_name: body.data.full_name, email: body.data.email, current_password: "", new_password: "", drive_folder_url: values.drive_folder_url ?? "" });
     setConfirmation("");
     setMeta((current) => current ? { ...current, must_change_password: false } : current);
 
@@ -126,6 +132,37 @@ export function ProfileManager() {
           </Field>
         </div>
 
+        {meta?.role === "manager" && (
+          <section className="mt-7 rounded-2xl border border-blue-200 bg-blue-50/60 p-5" aria-labelledby="google-drive-heading">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="max-w-xl">
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="text-blue-700" size={21} />
+                  <h2 id="google-drive-heading" className="font-display text-lg font-extrabold">Google Drive de la empresa</h2>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-700">
+                  Conecta tu cuenta y pega una carpeta raíz. Los colaboradores/as usarán esta misma carpeta automáticamente para subir archivos de tareas.
+                </p>
+              </div>
+              <a href="/api/google/connect?return=/manager/profile" className="inline-flex items-center gap-2 rounded-xl border border-blue-300 bg-white px-4 py-2.5 text-sm font-bold text-blue-800 hover:bg-blue-100">
+                <ExternalLink size={17} />
+                {meta.google_email ? "Reconectar Google" : "Conectar Google"}
+              </a>
+            </div>
+            <p className="mt-4 text-sm font-semibold text-slate-700">
+              Estado: {meta.google_email ? `Conectado como ${meta.google_email}` : "Google no conectado"}
+            </p>
+            <div className="mt-4">
+              <Field label="Enlace de carpeta raíz de Drive" error={errors.drive_folder_url?.message}>
+                <input type="url" {...register("drive_folder_url")} placeholder="https://drive.google.com/drive/folders/..." className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5" />
+              </Field>
+              <p className="mt-2 text-xs text-slate-600">
+                Abre tu carpeta en Drive, copia el enlace y pégalo aquí. Primero debes conectar Google para que TaskKeep pueda validar y organizar los archivos.
+              </p>
+            </div>
+          </section>
+        )}
+
         <div className="mt-7 flex items-center gap-2">
           <KeyRound className="text-indigo-600" size={20} />
           <h2 className="font-display text-lg font-extrabold">Cambiar contraseña</h2>
@@ -161,6 +198,6 @@ function profileCompany(company: { name: string } | { name: string }[] | null | 
 
 function roleLabel(role: ProfileMeta["role"] | undefined) {
   if (role === "admin") return "Administrador";
-  if (role === "manager") return "Gestora";
-  return "Colaboradora";
+  if (role === "manager") return "Gestor/a";
+  return "Colaborador/a";
 }

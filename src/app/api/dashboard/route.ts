@@ -12,7 +12,7 @@ export async function GET() {
         supabase.from("companies").select("id,is_active", { count: "exact" }).is("deleted_at", null),
         supabase.from("users").select("id", { count: "exact", head: true }).eq("role", "manager").eq("is_active", true).is("deleted_at", null),
         supabase.from("users").select("id", { count: "exact", head: true }).eq("role", "collaborator").eq("is_active", true).is("deleted_at", null),
-        supabase.from("users").select("id,full_name,email,role,created_at,company:companies(name)").neq("role", "admin").is("deleted_at", null).order("created_at", { ascending: false }).limit(6),
+        supabase.from("users").select("id,full_name,email,role,created_at,company:companies!users_company_id_fkey(name)").neq("role", "admin").is("deleted_at", null).order("created_at", { ascending: false }).limit(6),
       ]);
       for (const result of [companies, managers, collaborators, recentUsers]) if (result.error) throw result.error;
       const companyRows = companies.data ?? [];
@@ -35,7 +35,7 @@ export async function GET() {
       .is("deleted_at", null);
     if (auth.user.role === "collaborator") taskQuery = taskQuery.eq("responsible_id", auth.user.id);
     const [tasksResult, requestsResult, fileRequestsResult] = await Promise.all([
-      taskQuery.order("deadline", { ascending: true }),
+      taskQuery.order("deadline", { ascending: true, nullsFirst: false }),
       auth.user.role === "manager"
         ? supabase.from("task_status_requests").select("id,task:tasks!inner(company_id)").eq("task.company_id", auth.user.companyId!).eq("review_status", "pending_review")
         : Promise.resolve({ data: [], error: null }),
@@ -55,8 +55,9 @@ export async function GET() {
         pending: tasks.filter((task) => task.status === "pending").length,
         inProgress: tasks.filter((task) => task.status === "in_progress").length,
         completed: tasks.filter((task) => task.status === "completed").length,
-        overdue: tasks.filter((task) => task.status !== "completed" && new Date(task.deadline).getTime() < now).length,
+        overdue: tasks.filter((task) => task.deadline && task.status !== "completed" && new Date(task.deadline).getTime() < now).length,
         dueSoon: tasks.filter((task) => {
+          if (!task.deadline) return false;
           const deadline = new Date(task.deadline).getTime();
           return task.status !== "completed" && deadline >= now && deadline <= week;
         }).length,

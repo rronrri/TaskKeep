@@ -1,106 +1,28 @@
 # Reporte de implementación
 
-Fecha de revisión: 12 de junio de 2026.
-
-## Estado general
-
-TaskKeep dispone de los flujos visibles principales para administración, gestoras y
-colaboradoras. La aplicación compila en modo producción, se ejecuta en Docker y
-cuenta con una prueba de integración reutilizable.
+Fecha de revisión: 15 de junio de 2026.
 
 ## Funcionalidad terminada
 
-### Experiencia de usuario
+- Roles y permisos para administrador/a, gestor/a y colaborador/a.
+- Contraseña temporal con cambio obligatorio.
+- Empresas, límites y eliminación permanente.
+- Creación, edición y eliminación permanente de cuentas.
+- Auditoría con ventana modal de detalle.
+- Tareas en tarjetas/lista, filtros, calendario, prioridad y fijado.
+- Gestores/as asignan tareas a su equipo.
+- Colaboradores/as reciben asignaciones y crean tareas personales solo para sí mismos/as.
+- Comentarios, historial y solicitudes de cambio de estado.
+- Google Drive por empresa: gestor/a conecta OAuth, configura carpeta raíz, colaboradores/as heredan la carpeta y los archivos se organizan por tarea.
+- Carga, aprobación, rechazo y movimiento de archivos a carpeta/subcarpeta de Drive.
+- Recordatorios opcionales diarios, mensuales o 5, 3 y 1 día antes de la fecha límite.
+- Aviso adicional al gestor/a cuando la tarea pertenece a un/a colaborador/a.
+- Recuperación de contraseña, Resend, cron, Docker y healthcheck.
 
-- Dashboards con métricas reales por rol.
-- Próximas tareas, vencidas, próximas a vencer y solicitudes pendientes.
-- Tareas en tarjetas o lista.
-- Búsqueda, filtros por estado, prioridad, responsable, deadline y fijadas.
-- Ordenamiento y paginación.
-- Calendario interactivo con vista previa y apertura de tareas.
-- Creación y edición mediante modales accesibles.
-- Fijado directo desde el tablero.
-- Colores predeterminados por prioridad.
+## Producción
 
-### Detalle de tareas
-
-- Vista completa dentro de un modal.
-- Comentarios para gestoras y colaboradoras.
-- Historial de cambios de estado.
-- Historial de solicitudes aprobadas o rechazadas.
-- Listado y apertura de archivos adjuntos.
-- Subida de archivos para gestoras y pasantes cuando Drive está configurado.
-- Los archivos de pasantes quedan pendientes de aprobación.
-- Las gestoras pueden aprobar o rechazar archivos con un comentario.
-- Los pasantes consultan el estado y comentario de sus propios archivos.
-- Eliminación de archivos según autor y rol.
-- Creación automática de carpetas de empresa y tarea en Google Drive.
-
-### Cuenta y autenticación
-
-- Inicio y cierre de sesión mediante JWT en cookie HTTP-only.
-- Cookie segura deducida de `APP_URL` o configurable con `COOKIE_SECURE`.
-- Perfil editable para todos los roles.
-- Cambio de contraseña verificando la contraseña actual.
-- Contraseña temporal marcada para cambio al primer acceso.
-- Recuperación por correo con token de un solo uso y vencimiento de 30 minutos.
-
-### Administración
-
-- Empresas con límites de gestoras y colaboradoras.
-- Creación, edición y eliminación de empresas.
-- Creación, edición, desactivación y reactivación de cuentas.
-- Búsqueda y filtros de personas.
-- Correo de bienvenida.
-- Auditoría visible de acciones sensibles.
-- Pantalla de estado de integraciones.
-- Pantalla de entregas y errores de recordatorios.
-
-### Operación y seguridad
-
-- Control de roles y pertenencia a empresa.
-- Validación Zod en frontend y backend.
-- Rate limiting básico en login, recuperación, archivos, comentarios y solicitudes.
-- Validación de origen en operaciones mutables sensibles.
-- Cabeceras CSP, anti-frame, MIME, referrer y permisos.
-- Historial y auditoría para empresas, cuentas, tareas, comentarios y aprobaciones.
-- Recordatorios idempotentes a 7, 3 y 1 día.
-- Programación diaria incluida en `vercel.json`.
-- RLS habilitado; el backend usa exclusivamente la service role y autorización propia.
-- Migraciones SQL versionadas.
-
-### Calidad
-
-- `npm run lint`.
-- `npm run build`.
-- `npm run test:smoke`.
-- Healthcheck Docker en `/api/health`.
-
-## Dependencias externas pendientes
-
-Estas partes no pueden activarse solo con código:
-
-1. **Google Drive**
-   - La interfaz y el flujo están implementados.
-   - Falta proporcionar `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY` y
-     `GOOGLE_DRIVE_ROOT_FOLDER_ID` válidos.
-   - Un OAuth Client ID por sí solo no permite al servidor subir archivos.
-
-2. **Correo**
-   - Bienvenida, recuperación y recordatorios están implementados.
-   - Para entrega real se debe verificar el dominio/remitente configurado en Resend.
-
-3. **Producción**
-   - Rotar todas las claves compartidas durante desarrollo.
-   - Configurar `APP_URL` con HTTPS, `COOKIE_SECURE=true` y secretos definitivos.
-   - Confirmar que Vercel Cron esté habilitado en el proyecto desplegado.
-   - Configurar observabilidad centralizada del proveedor de despliegue.
-
-## Mejoras técnicas no bloqueantes
-
-- Ampliar las pruebas automatizadas con navegador cuando exista un entorno CI.
-- Sustituir el rate limit en memoria por Upstash Redis para múltiples instancias.
-- Revisar periódicamente `npm audit` y actualizar dependencias obsoletas.
-- Migrar gradualmente las cargas de datos a TanStack Query si se necesita cacheo
-  avanzado; actualmente los flujos sincronizan mediante `fetch`.
-- Eliminar la columna histórica `tasks.color` en una migración futura.
+- Verificar dominio/remitente en Resend.
+- Configurar `APP_URL` con HTTPS y `COOKIE_SECURE=true`.
+- Rotar las claves compartidas durante desarrollo.
+- Confirmar Vercel Cron y observabilidad.
+- Sustituir rate limit en memoria por Redis si se usan varias instancias.

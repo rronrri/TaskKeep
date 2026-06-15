@@ -22,6 +22,10 @@ body {
   font-family: var(--font-inter), sans-serif;
 }
 button, input, select, textarea { font: inherit; }
+button:not(:disabled), a[href], select, label[for], input[type="checkbox"], input[type="radio"] { cursor: pointer; }
+button, a[href], select { transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
+button:not(:disabled):hover { filter: brightness(0.97); }
+button:disabled { cursor: not-allowed; }
 :focus-visible { outline: 3px solid #a5b4fc; outline-offset: 2px; }
 .card {
   border: 1px solid var(--border);

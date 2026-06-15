@@ -13,8 +13,8 @@ import type { UserRole } from "@/types";
 
 const roleLabels: Record<UserRole, string> = {
   admin: "administración",
-  manager: "gestora",
-  collaborator: "colaboradora",
+  manager: "gestor/a",
+  collaborator: "colaborador/a",
 };
 
 export function UserWelcomeEmail({

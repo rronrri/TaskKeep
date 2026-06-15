@@ -57,6 +57,8 @@ export function TaskPreviewDialog({
   const [error, setError] = useState("");
   const [reviewFile, setReviewFile] = useState<{ id: string; name: string; decision: "approved" | "rejected" } | null>(null);
   const [reviewComment, setReviewComment] = useState("");
+  const [destinationFolder, setDestinationFolder] = useState("");
+  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
     if (!task) return;
@@ -71,7 +73,7 @@ export function TaskPreviewDialog({
 
   if (!task) return null;
   const priority = priorityStyles[task.priority];
-  const overdue = task.status !== "completed" && isBefore(new Date(task.deadline), new Date());
+  const overdue = Boolean(task.deadline) && task.status !== "completed" && isBefore(new Date(task.deadline!), new Date());
 
   const addComment = async () => {
     if (!comment.trim()) return;
@@ -92,6 +94,19 @@ export function TaskPreviewDialog({
     setDetail((current) => current ? { ...current, comments: [...current.comments, body.data] } : current);
   };
 
+  const removeFile = async (fileId: string) => {
+    setBusy(true);
+    setError("");
+    const response = await fetch(`/api/files/${fileId}`, { method: "DELETE" });
+    const body = await response.json();
+    setBusy(false);
+    if (!response.ok) {
+      setError(body.error ?? "No se pudo eliminar el archivo");
+      return;
+    }
+    setDetail((current) => current ? { ...current, files: current.files.filter((file) => file.id !== fileId) } : current);
+  };
+
   const uploadFile = async (file: File) => {
     setBusy(true);
     setError("");
@@ -108,17 +123,16 @@ export function TaskPreviewDialog({
     setDetail((current) => current ? { ...current, files: [body.data, ...current.files] } : current);
   };
 
-  const removeFile = async (fileId: string) => {
-    setBusy(true);
-    setError("");
-    const response = await fetch(`/api/files/${fileId}`, { method: "DELETE" });
+  const loadFolders = async (force = false) => {
+    if (!force && folders.length > 0) return;
+    const response = await fetch(`/api/tasks/${task.id}/drive-folders`, { cache: "no-store" });
     const body = await response.json();
-    setBusy(false);
     if (!response.ok) {
-      setError(body.error ?? "No se pudo eliminar el archivo");
+      setError(body.error ?? "No se pudieron cargar las carpetas de Drive");
       return;
     }
-    setDetail((current) => current ? { ...current, files: current.files.filter((file) => file.id !== fileId) } : current);
+    setDestinationFolder(body.data.rootTaskFolderId ?? "");
+    setFolders(body.data.folders ?? []);
   };
 
   const reviewUploadedFile = async () => {
@@ -128,7 +142,7 @@ export function TaskPreviewDialog({
     const response = await fetch(`/api/files/${reviewFile.id}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision: reviewFile.decision, comment: reviewComment }),
+        body: JSON.stringify({ decision: reviewFile.decision, comment: reviewComment, drive_folder_id: destinationFolder || undefined }),
     });
     const body = await response.json();
     setBusy(false);
@@ -144,6 +158,7 @@ export function TaskPreviewDialog({
     } : current);
     setReviewFile(null);
     setReviewComment("");
+    setDestinationFolder("");
   };
 
   return (
@@ -155,7 +170,7 @@ export function TaskPreviewDialog({
         </div>
         <p className="mt-5 whitespace-pre-wrap text-sm leading-6 text-slate-700">{task.description || "Sin descripción."}</p>
         <div className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
-          <p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}><CalendarClock size={18} /> {format(new Date(task.deadline), "d MMM yyyy, HH:mm", { locale: es })}{overdue && " · Vencida"}</p>
+          <p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}><CalendarClock size={18} /> {task.deadline ? format(new Date(task.deadline), "d MMM yyyy, HH:mm", { locale: es }) : "Sin fecha límite"}{overdue && " · Vencida"}</p>
           <p className="flex items-center gap-2"><UserRound size={18} /> {task.responsible?.full_name ?? "Responsable asignado"}</p>
         </div>
       </div>
@@ -194,14 +209,14 @@ export function TaskPreviewDialog({
         ) : tab === "history" ? (
           <div className="mt-4 max-h-72 space-y-3 overflow-y-auto">
             {detail.history.length === 0 && detail.requests.length === 0 ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No hay cambios registrados.</p> : <>
-              {detail.requests.map((request) => <article key={request.id} className="rounded-xl border border-slate-200 p-4 text-sm"><div className="flex flex-wrap justify-between gap-2"><p><strong>{request.requester?.full_name ?? "Colaboradora"}</strong> solicitó {statusLabels[request.requested_status].toLowerCase()}.</p><span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold">{requestLabels[request.review_status]}</span></div>{request.manager_comment && <p className="mt-2 text-slate-600">Comentario: {request.manager_comment}</p>}<time className="mt-2 block text-xs text-slate-500">{new Date(request.created_at).toLocaleString("es-EC")}</time></article>)}
-              {detail.history.map((item) => <article key={item.id} className="rounded-xl border border-slate-200 p-4 text-sm"><p><strong>{item.user?.full_name ?? "Gestora"}</strong> cambió el estado de {statusLabels[item.old_status].toLowerCase()} a <strong>{statusLabels[item.new_status].toLowerCase()}</strong>.</p><time className="mt-2 block text-xs text-slate-500">{new Date(item.created_at).toLocaleString("es-EC")}</time></article>)}
+              {detail.requests.map((request) => <article key={request.id} className="rounded-xl border border-slate-200 p-4 text-sm"><div className="flex flex-wrap justify-between gap-2"><p><strong>{request.requester?.full_name ?? "Colaborador/a"}</strong> solicitó {statusLabels[request.requested_status].toLowerCase()}.</p><span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold">{requestLabels[request.review_status]}</span></div>{request.manager_comment && <p className="mt-2 text-slate-600">Comentario: {request.manager_comment}</p>}<time className="mt-2 block text-xs text-slate-500">{new Date(request.created_at).toLocaleString("es-EC")}</time></article>)}
+              {detail.history.map((item) => <article key={item.id} className="rounded-xl border border-slate-200 p-4 text-sm"><p><strong>{item.user?.full_name ?? "Gestor/a"}</strong> cambió el estado de {statusLabels[item.old_status].toLowerCase()} a <strong>{statusLabels[item.new_status].toLowerCase()}</strong>.</p><time className="mt-2 block text-xs text-slate-500">{new Date(item.created_at).toLocaleString("es-EC")}</time></article>)}
             </>}
           </div>
         ) : (
           <div className="mt-4">
-            {detail.capabilities.canUpload && <div className="mb-4 rounded-xl border border-dashed border-indigo-300 bg-indigo-50/50 p-4"><label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 font-bold ${detail.capabilities.driveConfigured ? "bg-indigo-600 text-white" : "cursor-not-allowed bg-slate-200 text-slate-400"}`}><Upload size={18} /> Subir archivo<input type="file" className="hidden" disabled={!detail.capabilities.driveConfigured || busy} accept=".pdf,.png,.jpg,.jpeg,.txt,.docx" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); event.target.value = ""; }} /></label><p className="mt-2 text-xs text-slate-600">{role === "collaborator" ? "Tu archivo quedará pendiente hasta que una gestora lo apruebe." : "Los archivos subidos por gestoras quedan aprobados automáticamente."}</p>{!detail.capabilities.driveConfigured && <p className="mt-2 text-xs font-semibold text-amber-700">Google Drive necesita una cuenta de servicio configurada para habilitar cargas.</p>}</div>}
-            {reviewFile && <div className={`mb-4 rounded-xl border p-4 ${reviewFile.decision === "approved" ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}><p className="text-sm font-bold">{reviewFile.decision === "approved" ? "Aprobar" : "Rechazar"} “{reviewFile.name}”</p><textarea value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} rows={2} placeholder="Comentario opcional para el pasante" className="mt-3 w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" /><div className="mt-3 flex justify-end gap-2"><button onClick={() => { setReviewFile(null); setReviewComment(""); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold">Cancelar</button><button disabled={busy} onClick={() => void reviewUploadedFile()} className={`rounded-lg px-3 py-2 text-sm font-bold text-white ${reviewFile.decision === "approved" ? "bg-emerald-600" : "bg-red-600"}`}>Confirmar</button></div></div>}
+            {detail.capabilities.canUpload && <div className="mb-4 rounded-xl border border-dashed border-indigo-300 bg-indigo-50/50 p-4"><label className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 font-bold ${detail.capabilities.driveConfigured ? "bg-indigo-600 text-white" : "cursor-not-allowed bg-slate-200 text-slate-400"}`}><Upload size={18} /> Subir archivo<input type="file" className="hidden" disabled={!detail.capabilities.driveConfigured || busy} accept=".pdf,.png,.jpg,.jpeg,.txt,.docx" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); event.target.value = ""; }} /></label><p className="mt-2 text-xs text-slate-600">{role === "collaborator" ? "Tu archivo quedará pendiente hasta que un/a gestor/a lo apruebe." : "Los archivos subidos por gestores/as quedan aprobados automáticamente."}</p>{!detail.capabilities.driveConfigured && <p className="mt-2 text-xs font-semibold text-amber-700">El/la gestor/a debe conectar Google Drive y configurar una carpeta raíz desde su perfil.</p>}</div>}
+            {reviewFile && <div className={`mb-4 rounded-xl border p-4 ${reviewFile.decision === "approved" ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}><p className="text-sm font-bold">{reviewFile.decision === "approved" ? "Aprobar" : "Rechazar"} “{reviewFile.name}”</p>{reviewFile.decision === "approved" && <label className="mt-3 block text-sm font-bold">Guardar en Drive<select value={destinationFolder} onFocus={() => void loadFolders()} onChange={(event) => setDestinationFolder(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option value={destinationFolder}>Carpeta principal de la tarea</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select><span className="mt-1 block text-xs font-normal text-slate-600">Si necesitas más subcarpetas, créalas en Drive dentro de la carpeta de la tarea y vuelve a abrir este selector.</span></label>}<textarea value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} rows={2} placeholder="Comentario opcional para el pasante" className="mt-3 w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" /><div className="mt-3 flex justify-end gap-2"><button onClick={() => { setReviewFile(null); setReviewComment(""); setDestinationFolder(""); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold">Cancelar</button><button disabled={busy} onClick={() => void reviewUploadedFile()} className={`rounded-lg px-3 py-2 text-sm font-bold text-white ${reviewFile.decision === "approved" ? "bg-emerald-600" : "bg-red-600"}`}>Confirmar</button></div></div>}
             <div className="space-y-3">{detail.files.length === 0 ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No hay archivos adjuntos.</p> : detail.files.map((file) => {
               const canRemove = detail.capabilities.canReviewFiles || file.uploaded_by === detail.capabilities.currentUserId;
               return <article key={file.id} className="rounded-xl border border-slate-200 p-3">
@@ -214,7 +229,7 @@ export function TaskPreviewDialog({
                   {canRemove && <button disabled={busy} onClick={() => void removeFile(file.id)} className="rounded-lg p-2 text-red-700 hover:bg-red-50" aria-label={`Eliminar ${file.file_name}`}><Trash2 size={17} /></button>}
                 </div>
                 {file.review_comment && <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">Comentario de revisión: {file.review_comment}</p>}
-                {detail.capabilities.canReviewFiles && file.approval_status === "pending" && <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3"><button onClick={() => { setReviewFile({ id: file.id, name: file.file_name, decision: "rejected" }); setReviewComment(""); }} className="flex items-center gap-1 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50"><X size={15} /> Rechazar</button><button onClick={() => { setReviewFile({ id: file.id, name: file.file_name, decision: "approved" }); setReviewComment(""); }} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white"><Check size={15} /> Aprobar</button></div>}
+                {detail.capabilities.canReviewFiles && file.approval_status === "pending" && <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3"><button onClick={() => { setReviewFile({ id: file.id, name: file.file_name, decision: "rejected" }); setReviewComment(""); setDestinationFolder(""); setFolders([]); }} className="flex items-center gap-1 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50"><X size={15} /> Rechazar</button><button onClick={() => { setReviewFile({ id: file.id, name: file.file_name, decision: "approved" }); setReviewComment(""); setDestinationFolder(""); setFolders([]); void loadFolders(true); }} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white"><Check size={15} /> Aprobar</button></div>}
               </article>;
             })}</div>
           </div>

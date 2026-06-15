@@ -3,6 +3,7 @@ import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { updateTaskSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
+import { reminderFields } from "@/lib/tasks/reminders";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -14,7 +15,7 @@ export async function GET(_: Request, context: Context) {
     const supabase = createAdminClient();
     let taskQuery = supabase
       .from("tasks")
-      .select("*, responsible:users!tasks_responsible_id_fkey(full_name,email)")
+      .select("*, responsible:users!tasks_responsible_id_fkey(full_name,email), company:companies!tasks_company_id_fkey(drive_folder_id,drive_owner_user_id)")
       .eq("id", id)
       .is("deleted_at", null);
     if (auth.user.role !== "admin") taskQuery = taskQuery.eq("company_id", auth.user.companyId!);
@@ -48,7 +49,8 @@ export async function GET(_: Request, context: Context) {
         canUpload: auth.user.role === "manager" || auth.user.role === "collaborator",
         canReviewFiles: auth.user.role === "manager",
         currentUserId: auth.user.id,
-        driveConfigured: Boolean(process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY),
+        driveConfigured: Boolean((Array.isArray(task.company) ? task.company[0] : task.company)?.drive_folder_id && (Array.isArray(task.company) ? task.company[0] : task.company)?.drive_owner_user_id),
+        isOwnTask: task.created_by === auth.user.id && task.responsible_id === auth.user.id,
       },
     });
   } catch (error) {
@@ -57,17 +59,55 @@ export async function GET(_: Request, context: Context) {
 }
 
 export async function PATCH(request: Request, context: Context) {
-  const auth = await requireApiUser(["manager"]);
+  const auth = await requireApiUser(["manager", "collaborator"]);
   if (auth.error) return auth.error;
   try {
     const { id } = await context.params;
     const input = updateTaskSchema.parse(await request.json());
+    const normalized = input.reminder_mode
+      ? { ...input, ...reminderFields(input.reminder_mode, input.deadline) }
+      : input;
     const supabase = createAdminClient();
-    if (input.responsible_id) {
+    if (auth.user.role === "collaborator") {
+      const { data: owned } = await supabase
+        .from("tasks")
+        .select("id,status")
+        .eq("id", id)
+        .eq("company_id", auth.user.companyId!)
+        .eq("created_by", auth.user.id)
+        .eq("responsible_id", auth.user.id)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (!owned) return NextResponse.json({ error: "Solo puedes editar tareas creadas por ti" }, { status: 403 });
+      if (normalized.responsible_id && normalized.responsible_id !== auth.user.id) {
+        return NextResponse.json({ error: "No puedes asignar tareas a otras personas" }, { status: 403 });
+      }
+      const update = { ...normalized, responsible_id: auth.user.id, is_pinned: undefined };
+      delete update.is_pinned;
+      const { data, error } = await supabase
+        .from("tasks")
+        .update({ ...update, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      if (normalized.status && normalized.status !== owned.status) {
+        await supabase.from("task_status_logs").insert({
+          task_id: id,
+          changed_by: auth.user.id,
+          old_status: owned.status,
+          new_status: normalized.status,
+          source: "collaborator_self_direct",
+        });
+      }
+      await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.updated", entityType: "task", entityId: id });
+      return NextResponse.json({ data });
+    }
+    if (normalized.responsible_id) {
       const { data: responsible } = await supabase
         .from("users")
         .select("id")
-        .eq("id", input.responsible_id)
+        .eq("id", normalized.responsible_id)
         .eq("company_id", auth.user.companyId!)
         .eq("is_active", true)
         .is("deleted_at", null)
@@ -76,18 +116,18 @@ export async function PATCH(request: Request, context: Context) {
         return NextResponse.json({ error: "Responsable no válido" }, { status: 400 });
       }
     }
-    if (input.status) {
+    if (normalized.status) {
       const { data, error } = await supabase.rpc("manager_update_task_status", {
         target_task_id: id,
         actor_id: auth.user.id,
         actor_company_id: auth.user.companyId,
-        next_status: input.status,
+        next_status: normalized.status,
       });
       if (error) throw error;
-      const rest = { ...input };
+      const rest = { ...normalized };
       delete rest.status;
       if (Object.keys(rest).length === 0) {
-        await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.status_updated", entityType: "task", entityId: id, metadata: { status: input.status } });
+        await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.status_updated", entityType: "task", entityId: id, metadata: { status: normalized.status } });
         return NextResponse.json({ data });
       }
       const { data: updated, error: updateError } = await supabase
@@ -104,7 +144,7 @@ export async function PATCH(request: Request, context: Context) {
     }
     const { data, error } = await supabase
       .from("tasks")
-      .update({ ...input, updated_at: new Date().toISOString() })
+      .update({ ...normalized, updated_at: new Date().toISOString() })
       .eq("id", id)
       .eq("company_id", auth.user.companyId!)
       .is("deleted_at", null)
@@ -119,16 +159,21 @@ export async function PATCH(request: Request, context: Context) {
 }
 
 export async function DELETE(_: Request, context: Context) {
-  const auth = await requireApiUser(["manager"]);
+  const auth = await requireApiUser(["manager", "collaborator"]);
   if (auth.error) return auth.error;
   const { id } = await context.params;
   const now = new Date().toISOString();
-  const { error } = await createAdminClient()
+  let query = createAdminClient()
     .from("tasks")
     .update({ deleted_at: now, updated_at: now })
     .eq("id", id)
     .eq("company_id", auth.user.companyId!);
+  if (auth.user.role === "collaborator") {
+    query = query.eq("created_by", auth.user.id).eq("responsible_id", auth.user.id);
+  }
+  const { data, error } = await query.select("id").maybeSingle();
   if (error) return apiError(error);
+  if (!data) return NextResponse.json({ error: "Solo puedes eliminar tareas creadas por ti" }, { status: 403 });
   await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.deleted", entityType: "task", entityId: id });
   return NextResponse.json({ ok: true });
 }

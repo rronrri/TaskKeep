@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, ChevronLeft, ChevronRight, Pencil, Pin, PinOff, Plus, Trash2 } from "lucide-react";
+import { BellRing, CalendarClock, ChevronLeft, ChevronRight, Pencil, Pin, PinOff, Plus, Trash2 } from "lucide-react";
 import { format, isBefore } from "date-fns";
 import { es } from "date-fns/locale";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -97,7 +97,7 @@ export function ManagerTaskBoard() {
     setEditorOpen(true);
   };
 
-  const patchTask = async (task: Task, values: Partial<Pick<Task, "is_pinned" | "status">>, success: string) => {
+  const patchTask = async (task: Task, values: Partial<Pick<Task, "is_pinned" | "status" | "reminders_enabled">>, success: string) => {
     setServerError("");
     const response = await fetch(`/api/tasks/${task.id}`, {
       method: "PATCH",
@@ -126,6 +126,14 @@ export function ManagerTaskBoard() {
   const actions = (task: Task) => (
     <div className="flex gap-1">
       <button onClick={() => void patchTask(task, { is_pinned: !task.is_pinned }, task.is_pinned ? "Tarea desfijada." : "Tarea fijada.")} className="rounded-lg p-2 hover:bg-white/70" aria-label={task.is_pinned ? "Desfijar tarea" : "Fijar tarea"}>{task.is_pinned ? <PinOff size={17} /> : <Pin size={17} />}</button>
+      <button
+        onClick={() => openEdit(task)}
+        title="Configura avisos diarios, mensuales o por fecha límite. Los avisos por fecha se envían 5, 3 y 1 día antes."
+        aria-label="Activar recordatorios"
+        className={`rounded-lg p-2 hover:bg-white/70 ${task.reminders_enabled ? "text-amber-800" : ""}`}
+      >
+        <BellRing size={17} />
+      </button>
       <button onClick={() => openEdit(task)} className="rounded-lg p-2 hover:bg-white/70" aria-label={`Editar ${task.title}`}><Pencil size={17} /></button>
       <button onClick={() => setDeleteTarget(task)} className="rounded-lg p-2 text-red-700 hover:bg-red-50/70" aria-label={`Eliminar ${task.title}`}><Trash2 size={17} /></button>
     </div>
@@ -168,13 +176,13 @@ export function ManagerTaskBoard() {
         {loading ? <div className="card p-10 text-center text-slate-500">Cargando tareas...</div> : tasks.length === 0 ? <div className="card p-10 text-center text-slate-500">No hay tareas para estos filtros.</div> : viewMode === "cards" ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {tasks.map((task) => {
-              const overdue = task.status !== "completed" && isBefore(new Date(task.deadline), new Date());
+              const overdue = Boolean(task.deadline) && task.status !== "completed" && isBefore(new Date(task.deadline!), new Date());
               const priority = priorityStyles[task.priority];
               return (
                 <article key={task.id} className={`rounded-2xl border p-5 shadow-sm ${priority.card}`}>
                   <div className="flex items-start justify-between gap-3"><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${priority.badge}`}>Prioridad {priority.label}</span>{actions(task)}</div>
                   <button onClick={() => setPreview(task)} className="mt-4 block w-full text-left"><h2 className="font-display text-lg font-extrabold hover:text-indigo-700">{task.title}</h2>{task.description && <p className="mt-2 line-clamp-3 text-sm text-slate-700">{task.description}</p>}</button>
-                  <div className="mt-5 space-y-2 text-sm"><p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}><CalendarClock size={17} />{format(new Date(task.deadline), "d MMM yyyy, HH:mm", { locale: es })}{overdue && " · Vencida"}</p><p>Responsable: <strong>{task.responsible?.full_name ?? "Sin nombre"}</strong></p></div>
+                  <div className="mt-5 space-y-2 text-sm"><p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}><CalendarClock size={17} />{formatDeadline(task.deadline)}{overdue && " · Vencida"}</p><p>Responsable: <strong>{task.responsible?.full_name ?? "Sin nombre"}</strong></p></div>
                   <label className="mt-5 block border-t border-black/10 pt-4 text-xs font-bold uppercase tracking-wide">Estado<select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="mt-2 w-full rounded-lg border border-black/15 bg-white/75 px-3 py-2 text-sm normal-case"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></label>
                 </article>
               );
@@ -189,7 +197,7 @@ export function ManagerTaskBoard() {
                   <tr key={task.id} className="hover:bg-slate-50">
                     <td className="px-5 py-4"><button onClick={() => setPreview(task)} className="text-left"><p className="font-bold hover:text-indigo-700">{task.title}</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${priority.badge}`}>{priority.label}</span></button></td>
                     <td className="px-5 py-4">{task.responsible?.full_name ?? "Sin nombre"}</td>
-                    <td className="px-5 py-4">{format(new Date(task.deadline), "d MMM yyyy, HH:mm", { locale: es })}</td>
+                    <td className="px-5 py-4">{formatDeadline(task.deadline)}</td>
                     <td className="px-5 py-4"><select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></td>
                     <td className="px-5 py-4"><div className="flex justify-end">{actions(task)}</div></td>
                   </tr>
@@ -206,4 +214,8 @@ export function ManagerTaskBoard() {
       <ConfirmDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)} title="Eliminar tarea" description={`Se eliminará permanentemente “${deleteTarget?.title ?? ""}”.`} confirmLabel="Eliminar tarea" onConfirm={async () => { try { await removeTask(); } catch (error) { setServerError(error instanceof Error ? error.message : "No se pudo eliminar la tarea"); } }} />
     </section>
   );
+}
+
+function formatDeadline(deadline: string | null) {
+  return deadline ? format(new Date(deadline), "d MMM yyyy, HH:mm", { locale: es }) : "Sin fecha límite";
 }

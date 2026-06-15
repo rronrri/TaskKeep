@@ -14,7 +14,7 @@ interface Notification {
   user?: { full_name: string } | null;
 }
 
-const labels: Record<string, string> = { deadline_7_days: "7 días antes", deadline_3_days: "3 días antes", deadline_1_day: "1 día antes" };
+const labels: Record<string, string> = { deadline_7_days: "7 días antes (histórico)", deadline_5_days: "5 días antes", deadline_3_days: "3 días antes", deadline_1_day: "1 día antes", daily: "Diario", monthly: "Mensual" };
 
 export function NotificationLogViewer() {
   const [items, setItems] = useState<Notification[]>([]);
