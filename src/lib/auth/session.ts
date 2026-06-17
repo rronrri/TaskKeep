@@ -29,7 +29,7 @@ export async function createSession(user: SessionUser) {
   store.set(cookieName, token, {
     httpOnly: true,
     secure: shouldUseSecureCookie(),
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 8,
   });

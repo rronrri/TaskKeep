@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { taskSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
 import { reminderFields } from "@/lib/tasks/reminders";
+import { syncTaskReminders } from "@/lib/tasks/schedule-reminders";
 import { createDriveFolder } from "@/lib/google-drive";
 
 export async function GET(request: Request) {
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
       .is("deleted_at", null)
       .maybeSingle();
     if (!responsible) return NextResponse.json({ error: "Responsable no válido" }, { status: 400 });
-    const reminder = reminderFields(input.reminder_mode, input.deadline);
+    const reminder = reminderFields(input.reminder_mode, input.deadline, input.reminder_settings);
     const { data, error } = await supabase
       .from("tasks")
       .insert({ ...input, ...reminder, company_id: auth.user.companyId, created_by: auth.user.id })
@@ -88,6 +89,7 @@ export async function POST(request: Request) {
       }
     }
     await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.created", entityType: "task", entityId: data.id, metadata: { title: data.title } });
+    await syncTaskReminders(data.id).catch((reminderError) => console.error("No se pudieron programar los recordatorios", reminderError));
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) {
     return apiError(error);

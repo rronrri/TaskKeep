@@ -110,19 +110,19 @@ export function TaskBoard({ role }: { role: UserRole }) {
           {tasks.map((task) => {
             const overdue = Boolean(task.deadline) && task.status !== "completed" && isBefore(new Date(task.deadline!), new Date());
             const style = priorityStyles[task.priority];
-            return <article key={task.id} className={`rounded-2xl border p-5 text-left shadow-sm ${style.card}`}>
+            return <article key={task.id} onClick={() => setPreview(task)} className={`cursor-pointer rounded-2xl border p-5 text-left shadow-sm ${style.card}`}>
               <div className="mb-4 flex items-start justify-between gap-3">
                 <span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${style.badge}`}>Prioridad {style.label}</span>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
                   {task.is_pinned && <Pin size={18} aria-label="Tarea fijada" />}
                   {own(task) && <>
-                    <button onClick={() => { setEditing(task); setEditorOpen(true); }} title="Configura avisos diarios, mensuales o por fecha límite. Los avisos por fecha se envían 5, 3 y 1 día antes." aria-label="Activar recordatorios" className={`rounded-lg p-2 hover:bg-white/70 ${task.reminders_enabled ? "text-amber-800" : ""}`}><BellRing size={17} /></button>
+                    <button onClick={() => { setEditing(task); setEditorOpen(true); }} title="Configura avisos diarios, mensuales o por fecha límite. El predeterminado se adapta a la fecha." aria-label="Activar recordatorios" className={`rounded-lg p-2 hover:bg-white/70 ${task.reminders_enabled ? "text-amber-800" : ""}`}><BellRing size={17} /></button>
                     <button onClick={() => { setEditing(task); setEditorOpen(true); }} className="rounded-lg p-2 hover:bg-white/70" aria-label={`Editar ${task.title}`}><Pencil size={17} /></button>
                     <button onClick={() => setDeleteTarget(task)} className="rounded-lg p-2 text-red-700 hover:bg-red-50" aria-label={`Eliminar ${task.title}`}><Trash2 size={17} /></button>
                   </>}
                 </div>
               </div>
-              <button onClick={() => setPreview(task)} className="block w-full text-left"><h2 className="font-display text-lg font-extrabold">{task.title}</h2>{task.description && <p className="mt-2 line-clamp-3 text-sm text-slate-700">{task.description}</p>}</button>
+              <div className="block w-full text-left"><h2 className="font-display text-lg font-extrabold">{task.title}</h2>{task.description && <p className="mt-2 line-clamp-3 text-sm text-slate-700">{task.description}</p>}</div>
               <div className="mt-6 space-y-2 text-sm"><p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}><CalendarClock size={17} />{formatDeadline(task.deadline)}{overdue && " · Vencida"}</p>{task.reminders_enabled && <p className="flex items-center gap-2 font-semibold text-amber-800"><BellRing size={16} /> Recordatorios activos</p>}</div>
               <div className="mt-5 border-t border-black/10 pt-4"><span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-white">{statusLabel[task.status]}</span></div>
             </article>;

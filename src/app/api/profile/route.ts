@@ -57,8 +57,9 @@ export async function PATCH(request: Request) {
         try {
           await verifyDriveFolder(folderId, auth.user.id);
         } catch (error) {
+          const detail = error instanceof Error ? error.message : "No se pudo validar la carpeta de Google Drive";
           return NextResponse.json(
-            { error: error instanceof Error ? error.message : "No se pudo validar la carpeta de Google Drive" },
+            { error: detail.includes("File not found") ? "Google no encuentra esa carpeta con la cuenta conectada. Verifica que conectaste la cuenta dueña de la carpeta o que la carpeta esté compartida con esa cuenta." : detail },
             { status: 400 },
           );
         }
@@ -88,7 +89,7 @@ export async function PATCH(request: Request) {
       .from("users")
       .update(update)
       .eq("id", auth.user.id)
-      .select("id,company_id,full_name,email,role,must_change_password")
+      .select("id,company_id,full_name,email,role,created_at,must_change_password,google_email,google_connected_at,company:companies!users_company_id_fkey(name,drive_folder_url,drive_folder_id,drive_connected_at)")
       .single();
     if (error) throw error;
     await createSession({

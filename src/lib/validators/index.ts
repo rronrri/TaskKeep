@@ -27,6 +27,12 @@ export const updateUserSchema = z.object({
 });
 
 const reminderModeSchema = z.enum(["none", "daily", "monthly", "deadline"]);
+const reminderSettingsSchema = z.object({
+  deadline_offsets: z.array(z.number().int().min(1).max(525600)).max(20).optional(),
+  recurring_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  monthly_day: z.number().int().min(1).max(31).optional(),
+  timezone_offset_minutes: z.number().int().min(-840).max(840).optional(),
+}).default({});
 
 export const taskSchema = z.object({
   title: z.string().trim().min(2).max(160),
@@ -37,9 +43,19 @@ export const taskSchema = z.object({
   status: z.enum(["pending", "in_progress", "completed"]).default("pending"),
   is_pinned: z.boolean().default(false),
   reminder_mode: reminderModeSchema.default("none"),
+  reminder_settings: reminderSettingsSchema,
 }).superRefine((value, context) => {
   if (value.reminder_mode === "deadline" && !value.deadline) {
     context.addIssue({ code: "custom", path: ["deadline"], message: "Selecciona una fecha límite" });
+  }
+  if (value.reminder_mode === "deadline" && !value.reminder_settings.deadline_offsets?.length) {
+    context.addIssue({ code: "custom", path: ["reminder_settings"], message: "Configura al menos un aviso" });
+  }
+  if (value.reminder_mode === "deadline" && value.deadline && value.reminder_settings.deadline_offsets?.some((offset) => offset * 60000 >= new Date(value.deadline!).getTime() - Date.now())) {
+    context.addIssue({ code: "custom", path: ["reminder_settings"], message: "Los avisos deben ocurrir antes de la fecha limite y despues del momento actual" });
+  }
+  if ((value.reminder_mode === "daily" || value.reminder_mode === "monthly") && !value.reminder_settings.recurring_time) {
+    context.addIssue({ code: "custom", path: ["reminder_settings"], message: "Selecciona una hora para el recordatorio" });
   }
 });
 
@@ -52,9 +68,19 @@ export const updateTaskSchema = z.object({
   status: z.enum(["pending", "in_progress", "completed"]).optional(),
   is_pinned: z.boolean().optional(),
   reminder_mode: reminderModeSchema.optional(),
+  reminder_settings: reminderSettingsSchema.optional(),
 }).superRefine((value, context) => {
   if (value.reminder_mode === "deadline" && !value.deadline) {
     context.addIssue({ code: "custom", path: ["deadline"], message: "Selecciona una fecha límite" });
+  }
+  if (value.reminder_mode === "deadline" && !value.reminder_settings?.deadline_offsets?.length) {
+    context.addIssue({ code: "custom", path: ["reminder_settings"], message: "Configura al menos un aviso" });
+  }
+  if (value.reminder_mode === "deadline" && value.deadline && value.reminder_settings?.deadline_offsets?.some((offset) => offset * 60000 >= new Date(value.deadline!).getTime() - Date.now())) {
+    context.addIssue({ code: "custom", path: ["reminder_settings"], message: "Los avisos deben ocurrir antes de la fecha limite y despues del momento actual" });
+  }
+  if ((value.reminder_mode === "daily" || value.reminder_mode === "monthly") && !value.reminder_settings?.recurring_time) {
+    context.addIssue({ code: "custom", path: ["reminder_settings"], message: "Selecciona una hora para el recordatorio" });
   }
 });
 

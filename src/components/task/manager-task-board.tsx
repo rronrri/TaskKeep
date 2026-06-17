@@ -124,11 +124,11 @@ export function ManagerTaskBoard() {
   };
 
   const actions = (task: Task) => (
-    <div className="flex gap-1">
+    <div className="flex gap-1" onClick={(event) => event.stopPropagation()}>
       <button onClick={() => void patchTask(task, { is_pinned: !task.is_pinned }, task.is_pinned ? "Tarea desfijada." : "Tarea fijada.")} className="rounded-lg p-2 hover:bg-white/70" aria-label={task.is_pinned ? "Desfijar tarea" : "Fijar tarea"}>{task.is_pinned ? <PinOff size={17} /> : <Pin size={17} />}</button>
       <button
         onClick={() => openEdit(task)}
-        title="Configura avisos diarios, mensuales o por fecha límite. Los avisos por fecha se envían 5, 3 y 1 día antes."
+        title="Configura avisos diarios, mensuales o por fecha límite. El predeterminado se adapta a la fecha."
         aria-label="Activar recordatorios"
         className={`rounded-lg p-2 hover:bg-white/70 ${task.reminders_enabled ? "text-amber-800" : ""}`}
       >
@@ -179,11 +179,11 @@ export function ManagerTaskBoard() {
               const overdue = Boolean(task.deadline) && task.status !== "completed" && isBefore(new Date(task.deadline!), new Date());
               const priority = priorityStyles[task.priority];
               return (
-                <article key={task.id} className={`rounded-2xl border p-5 shadow-sm ${priority.card}`}>
+                <article key={task.id} onClick={() => setPreview(task)} className={`cursor-pointer rounded-2xl border p-5 shadow-sm ${priority.card}`}>
                   <div className="flex items-start justify-between gap-3"><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${priority.badge}`}>Prioridad {priority.label}</span>{actions(task)}</div>
-                  <button onClick={() => setPreview(task)} className="mt-4 block w-full text-left"><h2 className="font-display text-lg font-extrabold hover:text-indigo-700">{task.title}</h2>{task.description && <p className="mt-2 line-clamp-3 text-sm text-slate-700">{task.description}</p>}</button>
+                  <div className="mt-4 block w-full text-left"><h2 className="font-display text-lg font-extrabold hover:text-indigo-700">{task.title}</h2>{task.description && <p className="mt-2 line-clamp-3 text-sm text-slate-700">{task.description}</p>}</div>
                   <div className="mt-5 space-y-2 text-sm"><p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}><CalendarClock size={17} />{formatDeadline(task.deadline)}{overdue && " · Vencida"}</p><p>Responsable: <strong>{task.responsible?.full_name ?? "Sin nombre"}</strong></p></div>
-                  <label className="mt-5 block border-t border-black/10 pt-4 text-xs font-bold uppercase tracking-wide">Estado<select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="mt-2 w-full rounded-lg border border-black/15 bg-white/75 px-3 py-2 text-sm normal-case"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></label>
+                  <label onClick={(event) => event.stopPropagation()} className="mt-5 block border-t border-black/10 pt-4 text-xs font-bold uppercase tracking-wide">Estado<select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="mt-2 w-full rounded-lg border border-black/15 bg-white/75 px-3 py-2 text-sm normal-case"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></label>
                 </article>
               );
             })}
@@ -194,11 +194,11 @@ export function ManagerTaskBoard() {
               <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-4">Tarea</th><th className="px-5 py-4">Responsable</th><th className="px-5 py-4">Fecha límite</th><th className="px-5 py-4">Estado</th><th className="px-5 py-4 text-right">Acciones</th></tr></thead>
               <tbody className="divide-y divide-slate-200">
                 {tasks.map((task) => { const priority = priorityStyles[task.priority]; return (
-                  <tr key={task.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-4"><button onClick={() => setPreview(task)} className="text-left"><p className="font-bold hover:text-indigo-700">{task.title}</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${priority.badge}`}>{priority.label}</span></button></td>
+                  <tr key={task.id} onClick={() => setPreview(task)} className="cursor-pointer hover:bg-slate-50">
+                    <td className="px-5 py-4"><div className="text-left"><p className="font-bold hover:text-indigo-700">{task.title}</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${priority.badge}`}>{priority.label}</span></div></td>
                     <td className="px-5 py-4">{task.responsible?.full_name ?? "Sin nombre"}</td>
                     <td className="px-5 py-4">{formatDeadline(task.deadline)}</td>
-                    <td className="px-5 py-4"><select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></td>
+                    <td className="px-5 py-4" onClick={(event) => event.stopPropagation()}><select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></td>
                     <td className="px-5 py-4"><div className="flex justify-end">{actions(task)}</div></td>
                   </tr>
                 ); })}

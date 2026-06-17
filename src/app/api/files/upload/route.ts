@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const file = form.get("file");
     const taskId = String(form.get("task_id") ?? "");
+    const selectedFolderId = String(form.get("drive_folder_id") ?? "");
     if (!(file instanceof File) || file.size === 0 || file.size > 10 * 1024 * 1024 || !allowed.has(file.type)) {
       return NextResponse.json({ error: "Archivo vacío, no permitido o mayor a 10 MB" }, { status: 400 });
     }
@@ -34,38 +35,45 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "El/la gestor/a debe conectar Google Drive y configurar una carpeta raíz" }, { status: 409 });
     }
     let taskFolderId = task.drive_folder_id;
-    if (!taskFolderId) {
-      const taskFolder = await createDriveFolder(taskFolderName(task.id, task.title), company.drive_folder_id, company.drive_owner_user_id);
-      taskFolderId = taskFolder.id;
-      await supabase.from("tasks").update({ drive_folder_id: taskFolderId }).eq("id", task.id);
+    try {
+      if (!taskFolderId) {
+        const taskFolder = await createDriveFolder(taskFolderName(task.id, task.title), company.drive_folder_id, company.drive_owner_user_id);
+        taskFolderId = taskFolder.id;
+        await supabase.from("tasks").update({ drive_folder_id: taskFolderId }).eq("id", task.id);
+      }
+      const targetFolder = selectedFolderId || (auth.user.role === "manager"
+        ? taskFolderId
+        : (await findOrCreateDriveFolder("Pendientes", taskFolderId, company.drive_owner_user_id)).id);
+      const drive = await uploadToDrive(file, targetFolder, company.drive_owner_user_id);
+      const { data, error } = await supabase.from("task_files").insert({
+        task_id: task.id,
+        uploaded_by: auth.user.id,
+        file_name: file.name,
+        mime_type: file.type,
+        file_size: file.size,
+        drive_file_id: drive.id,
+        drive_web_url: drive.webViewLink,
+        drive_folder_id: targetFolder,
+        approval_status: auth.user.role === "manager" ? "approved" : "pending",
+        reviewed_by: auth.user.role === "manager" ? auth.user.id : null,
+        reviewed_at: auth.user.role === "manager" ? new Date().toISOString() : null,
+      }).select("id,uploaded_by,file_name,mime_type,file_size,drive_web_url,created_at,approval_status,review_comment,uploader:users!task_files_uploaded_by_fkey(full_name,role)").single();
+      if (error) throw error;
+      await writeAudit({
+        actorId: auth.user.id,
+        companyId: auth.user.companyId,
+        action: auth.user.role === "manager" ? "file.uploaded_approved" : "file.uploaded_pending",
+        entityType: "task_file",
+        entityId: data.id,
+        metadata: { taskId: task.id, fileName: file.name },
+      });
+      return NextResponse.json({ data }, { status: 201 });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("File not found")) {
+        return NextResponse.json({ error: "Google Drive no encuentra la carpeta configurada. Reconecta Google o vuelve a guardar una carpeta raíz accesible desde el perfil." }, { status: 400 });
+      }
+      throw error;
     }
-    const targetFolder = auth.user.role === "manager"
-      ? taskFolderId
-      : (await findOrCreateDriveFolder("Pendientes", taskFolderId, company.drive_owner_user_id)).id;
-    const drive = await uploadToDrive(file, targetFolder, company.drive_owner_user_id);
-    const { data, error } = await supabase.from("task_files").insert({
-      task_id: task.id,
-      uploaded_by: auth.user.id,
-      file_name: file.name,
-      mime_type: file.type,
-      file_size: file.size,
-      drive_file_id: drive.id,
-      drive_web_url: drive.webViewLink,
-      drive_folder_id: targetFolder,
-      approval_status: auth.user.role === "manager" ? "approved" : "pending",
-      reviewed_by: auth.user.role === "manager" ? auth.user.id : null,
-      reviewed_at: auth.user.role === "manager" ? new Date().toISOString() : null,
-    }).select("id,uploaded_by,file_name,mime_type,file_size,drive_web_url,created_at,approval_status,review_comment,uploader:users!task_files_uploaded_by_fkey(full_name,role)").single();
-    if (error) throw error;
-    await writeAudit({
-      actorId: auth.user.id,
-      companyId: auth.user.companyId,
-      action: auth.user.role === "manager" ? "file.uploaded_approved" : "file.uploaded_pending",
-      entityType: "task_file",
-      entityId: data.id,
-      metadata: { taskId: task.id, fileName: file.name },
-    });
-    return NextResponse.json({ data }, { status: 201 });
   } catch (error) {
     return apiError(error);
   }

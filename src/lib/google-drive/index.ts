@@ -21,13 +21,13 @@ async function driveFetch(path: string, ownerId: string, init: RequestInit = {})
 }
 
 export async function verifyDriveFolder(folderId: string, ownerId: string) {
-  const result = await driveFetch(`files/${encodeURIComponent(folderId)}?fields=id,name,mimeType,webViewLink`, ownerId);
+  const result = await driveFetch(`files/${encodeURIComponent(folderId)}?fields=id,name,mimeType,webViewLink&supportsAllDrives=true`, ownerId);
   if (result.mimeType !== folderMime) throw new Error("El enlace indicado no corresponde a una carpeta de Google Drive");
   return result as { id: string; name: string; webViewLink: string };
 }
 
 export async function createDriveFolder(name: string, parentId: string, ownerId: string) {
-  const result = await driveFetch("files?fields=id,webViewLink,name", ownerId, {
+  const result = await driveFetch("files?fields=id,webViewLink,name&supportsAllDrives=true", ownerId, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, mimeType: folderMime, parents: [parentId] }),
@@ -37,7 +37,7 @@ export async function createDriveFolder(name: string, parentId: string, ownerId:
 
 export async function listDriveFolders(parentId: string, ownerId: string) {
   const query = encodeURIComponent(`'${parentId}' in parents and mimeType='${folderMime}' and trashed=false`);
-  const result = await driveFetch(`files?q=${query}&fields=files(id,name,webViewLink)&orderBy=name`, ownerId);
+  const result = await driveFetch(`files?q=${query}&fields=files(id,name,webViewLink)&orderBy=name&includeItemsFromAllDrives=true&supportsAllDrives=true`, ownerId);
   return (result.files ?? []) as Array<{ id: string; name: string; webViewLink?: string }>;
 }
 
@@ -54,7 +54,7 @@ export async function uploadToDrive(file: File, folderId: string, ownerId: strin
   const prefix = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${file.type || "application/octet-stream"}\r\n\r\n`;
   const suffix = `\r\n--${boundary}--`;
   const body = new Blob([prefix, await file.arrayBuffer(), suffix]);
-  const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", {
+  const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink&supportsAllDrives=true", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
     body,
@@ -65,7 +65,7 @@ export async function uploadToDrive(file: File, folderId: string, ownerId: strin
 }
 
 export async function moveDriveFile(fileId: string, fromFolderId: string | null, toFolderId: string, ownerId: string) {
-  const params = new URLSearchParams({ addParents: toFolderId, fields: "id,webViewLink" });
+  const params = new URLSearchParams({ addParents: toFolderId, fields: "id,webViewLink", supportsAllDrives: "true" });
   if (fromFolderId) params.set("removeParents", fromFolderId);
   const result = await driveFetch(`files/${encodeURIComponent(fileId)}?${params}`, ownerId, { method: "PATCH" });
   return result as { id: string; webViewLink?: string };

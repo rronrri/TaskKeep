@@ -3,6 +3,13 @@ export type TaskStatus = "pending" | "in_progress" | "completed";
 export type TaskPriority = "low" | "medium" | "high" | "critical";
 export type ReminderMode = "none" | "daily" | "monthly" | "deadline";
 
+export interface ReminderSettings {
+  deadline_offsets?: number[];
+  recurring_time?: string;
+  monthly_day?: number;
+  timezone_offset_minutes?: number;
+}
+
 export interface SessionUser {
   id: string;
   companyId: string | null;
@@ -26,6 +33,7 @@ export interface Task {
   reminders_enabled: boolean;
   reminder_mode: ReminderMode;
   next_reminder_at: string | null;
+  reminder_settings: ReminderSettings;
   created_at: string;
   responsible?: { full_name: string; email: string } | null;
 }

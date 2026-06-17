@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarClock, Check, Clock3, FileText, History, MessageSquare, Pencil, Pin, PinOff, Send, Trash2, Upload, UserRound, X } from "lucide-react";
+import { CalendarClock, Check, Clock3, FileText, FolderOpen, History, MessageSquare, Pencil, Pin, PinOff, Send, Trash2, Upload, UserRound, X } from "lucide-react";
 import { format, isBefore } from "date-fns";
 import { es } from "date-fns/locale";
 import { AppDialog } from "@/components/ui/app-dialog";
@@ -51,14 +51,15 @@ export function TaskPreviewDialog({
   onRequestStatus?: (task: Task, status: TaskStatus) => void;
 }) {
   const [detail, setDetail] = useState<TaskDetail | null>(null);
-  const [tab, setTab] = useState<"comments" | "history" | "files">("comments");
+  const [tab, setTab] = useState<"comments" | "history" | "files">("files");
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reviewFile, setReviewFile] = useState<{ id: string; name: string; decision: "approved" | "rejected" } | null>(null);
   const [reviewComment, setReviewComment] = useState("");
   const [destinationFolder, setDestinationFolder] = useState("");
-  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([]);
+  const [destinationFolderName, setDestinationFolderName] = useState("");
+  const [openingPicker, setOpeningPicker] = useState(false);
 
   useEffect(() => {
     if (!task) return;
@@ -113,6 +114,7 @@ export function TaskPreviewDialog({
     const form = new FormData();
     form.set("task_id", task.id);
     form.set("file", file);
+    if (destinationFolder) form.set("drive_folder_id", destinationFolder);
     const response = await fetch("/api/files/upload", { method: "POST", body: form });
     const body = await response.json();
     setBusy(false);
@@ -123,16 +125,46 @@ export function TaskPreviewDialog({
     setDetail((current) => current ? { ...current, files: [body.data, ...current.files] } : current);
   };
 
-  const loadFolders = async (force = false) => {
-    if (!force && folders.length > 0) return;
-    const response = await fetch(`/api/tasks/${task.id}/drive-folders`, { cache: "no-store" });
-    const body = await response.json();
-    if (!response.ok) {
-      setError(body.error ?? "No se pudieron cargar las carpetas de Drive");
-      return;
+  const openDrivePicker = async () => {
+    setError("");
+    setOpeningPicker(true);
+    try {
+      await loadScript("https://apis.google.com/js/api.js");
+      await new Promise<void>((resolve) => window.gapi.load("picker", { callback: resolve }));
+      const [configResponse, tokenResponse] = await Promise.all([
+        fetch("/api/google/picker-config", { cache: "no-store" }),
+        fetch(`/api/tasks/${task.id}/drive-picker-token`, { cache: "no-store" }),
+      ]);
+      const configBody = await configResponse.json();
+      const tokenBody = await tokenResponse.json();
+      if (!configResponse.ok) throw new Error(configBody.error ?? "Google Picker no esta configurado");
+      if (!tokenResponse.ok) throw new Error(tokenBody.error ?? "No se pudo obtener acceso temporal a Google Drive");
+
+      const folderView = new window.google.picker.DocsView(window.google.picker.ViewId.FOLDERS)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(true)
+        .setMimeTypes("application/vnd.google-apps.folder");
+      const picker = new window.google.picker.PickerBuilder()
+        .setAppId(configBody.appId)
+        .setDeveloperKey(configBody.apiKey)
+        .setOAuthToken(tokenBody.access_token)
+        .addView(folderView)
+        .setTitle("Elige la carpeta de Drive para esta tarea")
+        .setCallback((data: PickerResponse) => {
+          if (data.action !== window.google.picker.Action.PICKED) return;
+          const folder = data.docs?.[0];
+          if (folder?.id) {
+            setDestinationFolder(folder.id);
+            setDestinationFolderName(folder.name ?? "Carpeta seleccionada");
+          }
+        })
+        .build();
+      picker.setVisible(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "No se pudo abrir Google Picker");
+    } finally {
+      setOpeningPicker(false);
     }
-    setDestinationFolder(body.data.rootTaskFolderId ?? "");
-    setFolders(body.data.folders ?? []);
   };
 
   const reviewUploadedFile = async () => {
@@ -159,6 +191,7 @@ export function TaskPreviewDialog({
     setReviewFile(null);
     setReviewComment("");
     setDestinationFolder("");
+    setDestinationFolderName("");
   };
 
   return (
@@ -192,9 +225,9 @@ export function TaskPreviewDialog({
 
       <div className="mt-6 border-t border-slate-200 pt-5">
         <div className="flex gap-2 overflow-x-auto" role="tablist">
+          <Tab active={tab === "files"} onClick={() => setTab("files")} icon={FileText} label={`Archivos ${detail ? `(${detail.files.length})` : ""}`} />
           <Tab active={tab === "comments"} onClick={() => setTab("comments")} icon={MessageSquare} label={`Comentarios ${detail ? `(${detail.comments.length})` : ""}`} />
           <Tab active={tab === "history"} onClick={() => setTab("history")} icon={History} label="Historial" />
-          <Tab active={tab === "files"} onClick={() => setTab("files")} icon={FileText} label={`Archivos ${detail ? `(${detail.files.length})` : ""}`} />
         </div>
         {error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
         {!detail ? <p className="py-8 text-center text-sm text-slate-500">Cargando actividad...</p> : tab === "comments" ? (
@@ -215,8 +248,20 @@ export function TaskPreviewDialog({
           </div>
         ) : (
           <div className="mt-4">
+            {detail.capabilities.canUpload && detail.capabilities.driveConfigured && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
+                <div>
+                  <p className="text-sm font-bold text-slate-800">Destino en Google Drive</p>
+                  <p className="mt-1 text-xs text-slate-600">{destinationFolderName ? `Seleccionado: ${destinationFolderName}` : "Si no eliges una carpeta, se usara la carpeta principal de la tarea."}</p>
+                </div>
+                <button type="button" disabled={openingPicker || busy} onClick={() => void openDrivePicker()} className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
+                  <FolderOpen size={17} />
+                  {openingPicker ? "Abriendo Google..." : "Elegir carpeta"}
+                </button>
+              </div>
+            )}
             {detail.capabilities.canUpload && <div className="mb-4 rounded-xl border border-dashed border-indigo-300 bg-indigo-50/50 p-4"><label className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 font-bold ${detail.capabilities.driveConfigured ? "bg-indigo-600 text-white" : "cursor-not-allowed bg-slate-200 text-slate-400"}`}><Upload size={18} /> Subir archivo<input type="file" className="hidden" disabled={!detail.capabilities.driveConfigured || busy} accept=".pdf,.png,.jpg,.jpeg,.txt,.docx" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); event.target.value = ""; }} /></label><p className="mt-2 text-xs text-slate-600">{role === "collaborator" ? "Tu archivo quedará pendiente hasta que un/a gestor/a lo apruebe." : "Los archivos subidos por gestores/as quedan aprobados automáticamente."}</p>{!detail.capabilities.driveConfigured && <p className="mt-2 text-xs font-semibold text-amber-700">El/la gestor/a debe conectar Google Drive y configurar una carpeta raíz desde su perfil.</p>}</div>}
-            {reviewFile && <div className={`mb-4 rounded-xl border p-4 ${reviewFile.decision === "approved" ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}><p className="text-sm font-bold">{reviewFile.decision === "approved" ? "Aprobar" : "Rechazar"} “{reviewFile.name}”</p>{reviewFile.decision === "approved" && <label className="mt-3 block text-sm font-bold">Guardar en Drive<select value={destinationFolder} onFocus={() => void loadFolders()} onChange={(event) => setDestinationFolder(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option value={destinationFolder}>Carpeta principal de la tarea</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select><span className="mt-1 block text-xs font-normal text-slate-600">Si necesitas más subcarpetas, créalas en Drive dentro de la carpeta de la tarea y vuelve a abrir este selector.</span></label>}<textarea value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} rows={2} placeholder="Comentario opcional para el pasante" className="mt-3 w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" /><div className="mt-3 flex justify-end gap-2"><button onClick={() => { setReviewFile(null); setReviewComment(""); setDestinationFolder(""); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold">Cancelar</button><button disabled={busy} onClick={() => void reviewUploadedFile()} className={`rounded-lg px-3 py-2 text-sm font-bold text-white ${reviewFile.decision === "approved" ? "bg-emerald-600" : "bg-red-600"}`}>Confirmar</button></div></div>}
+            {reviewFile && <div className={`mb-4 rounded-xl border p-4 ${reviewFile.decision === "approved" ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}><p className="text-sm font-bold">{reviewFile.decision === "approved" ? "Aprobar" : "Rechazar"} “{reviewFile.name}”</p>{reviewFile.decision === "approved" && <div className="mt-3 rounded-xl border border-emerald-200 bg-white/80 p-3"><p className="text-sm font-bold">Guardar en Drive</p><p className="mt-1 text-xs text-slate-600">{destinationFolderName ? `Seleccionado: ${destinationFolderName}` : "Si no eliges carpeta, se guardara en la carpeta principal de la tarea."}</p><button type="button" disabled={openingPicker || busy} onClick={() => void openDrivePicker()} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"><FolderOpen size={15} />{openingPicker ? "Abriendo Google..." : "Elegir carpeta"}</button></div>}<textarea value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} rows={2} placeholder="Comentario opcional para el pasante" className="mt-3 w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" /><div className="mt-3 flex justify-end gap-2"><button onClick={() => { setReviewFile(null); setReviewComment(""); setDestinationFolder(""); setDestinationFolderName(""); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold">Cancelar</button><button disabled={busy} onClick={() => void reviewUploadedFile()} className={`rounded-lg px-3 py-2 text-sm font-bold text-white ${reviewFile.decision === "approved" ? "bg-emerald-600" : "bg-red-600"}`}>Confirmar</button></div></div>}
             <div className="space-y-3">{detail.files.length === 0 ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No hay archivos adjuntos.</p> : detail.files.map((file) => {
               const canRemove = detail.capabilities.canReviewFiles || file.uploaded_by === detail.capabilities.currentUserId;
               return <article key={file.id} className="rounded-xl border border-slate-200 p-3">
@@ -229,7 +274,7 @@ export function TaskPreviewDialog({
                   {canRemove && <button disabled={busy} onClick={() => void removeFile(file.id)} className="rounded-lg p-2 text-red-700 hover:bg-red-50" aria-label={`Eliminar ${file.file_name}`}><Trash2 size={17} /></button>}
                 </div>
                 {file.review_comment && <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">Comentario de revisión: {file.review_comment}</p>}
-                {detail.capabilities.canReviewFiles && file.approval_status === "pending" && <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3"><button onClick={() => { setReviewFile({ id: file.id, name: file.file_name, decision: "rejected" }); setReviewComment(""); setDestinationFolder(""); setFolders([]); }} className="flex items-center gap-1 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50"><X size={15} /> Rechazar</button><button onClick={() => { setReviewFile({ id: file.id, name: file.file_name, decision: "approved" }); setReviewComment(""); setDestinationFolder(""); setFolders([]); void loadFolders(true); }} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white"><Check size={15} /> Aprobar</button></div>}
+                {detail.capabilities.canReviewFiles && file.approval_status === "pending" && <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3"><button onClick={() => { setReviewFile({ id: file.id, name: file.file_name, decision: "rejected" }); setReviewComment(""); setDestinationFolder(""); setDestinationFolderName(""); }} className="flex items-center gap-1 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50"><X size={15} /> Rechazar</button><button onClick={() => { setReviewFile({ id: file.id, name: file.file_name, decision: "approved" }); setReviewComment(""); setDestinationFolder(""); setDestinationFolderName(""); }} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white"><Check size={15} /> Aprobar</button></div>}
               </article>;
             })}</div>
           </div>
@@ -254,3 +299,17 @@ function formatBytes(value?: number | null) {
   if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
+function loadScript(src: string) {
+  return new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) return resolve();
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("No se pudo cargar Google Picker"));
+    document.body.appendChild(script);
+  });
+}
+
+type PickerResponse = { action: string; docs?: Array<{ id: string; name?: string }> };

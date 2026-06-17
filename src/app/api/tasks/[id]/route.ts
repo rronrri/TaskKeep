@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { updateTaskSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
 import { reminderFields } from "@/lib/tasks/reminders";
+import { cancelTaskReminders, syncTaskReminders } from "@/lib/tasks/schedule-reminders";
+import type { SessionUser } from "@/types";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -61,11 +63,21 @@ export async function GET(_: Request, context: Context) {
 export async function PATCH(request: Request, context: Context) {
   const auth = await requireApiUser(["manager", "collaborator"]);
   if (auth.error) return auth.error;
+  const { id } = await context.params;
+  const response = await applyTaskUpdate(request, auth.user, id);
+  // Reconciliamos los recordatorios programados solo si la actualización tuvo éxito.
+  if (response.status < 300) {
+    await syncTaskReminders(id).catch((error) => console.error("No se pudieron reprogramar los recordatorios", error));
+  }
+  return response;
+}
+
+async function applyTaskUpdate(request: Request, user: SessionUser, id: string) {
+  const auth = { user };
   try {
-    const { id } = await context.params;
     const input = updateTaskSchema.parse(await request.json());
     const normalized = input.reminder_mode
-      ? { ...input, ...reminderFields(input.reminder_mode, input.deadline) }
+      ? { ...input, ...reminderFields(input.reminder_mode, input.deadline, input.reminder_settings) }
       : input;
     const supabase = createAdminClient();
     if (auth.user.role === "collaborator") {
@@ -174,6 +186,7 @@ export async function DELETE(_: Request, context: Context) {
   const { data, error } = await query.select("id").maybeSingle();
   if (error) return apiError(error);
   if (!data) return NextResponse.json({ error: "Solo puedes eliminar tareas creadas por ti" }, { status: 403 });
+  await cancelTaskReminders(id).catch((error) => console.error("No se pudieron cancelar los recordatorios", error));
   await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.deleted", entityType: "task", entityId: id });
   return NextResponse.json({ ok: true });
 }
