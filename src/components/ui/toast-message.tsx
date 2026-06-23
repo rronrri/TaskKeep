@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef } from "react";
 import { CheckCircle2, CircleAlert, X } from "lucide-react";
@@ -6,23 +6,25 @@ import { CheckCircle2, CircleAlert, X } from "lucide-react";
 export function ToastMessages({
   success,
   error,
+  successAction,
   onClearSuccess,
   onClearError,
 }: {
   success?: string;
   error?: string;
+  successAction?: { label: string; onClick: () => void | Promise<void> } | null;
   onClearSuccess: () => void;
   onClearError: () => void;
 }) {
   return (
     <div className="pointer-events-none fixed right-4 top-4 z-[100] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-3" aria-live="polite">
       {error && <Toast message={error} type="error" onClose={onClearError} />}
-      {success && <Toast message={success} type="success" onClose={onClearSuccess} />}
+      {success && <Toast message={success} type="success" action={successAction} onClose={onClearSuccess} />}
     </div>
   );
 }
 
-function Toast({ message, type, onClose }: { message: string; type: "success" | "error"; onClose: () => void }) {
+function Toast({ message, type, action, onClose }: { message: string; type: "success" | "error"; action?: { label: string; onClick: () => void | Promise<void> } | null; onClose: () => void }) {
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -36,8 +38,15 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
   return (
     <div role={success ? "status" : "alert"} className={`pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-2xl border p-4 shadow-xl backdrop-blur ${success ? "border-emerald-200 bg-emerald-50/95 text-emerald-950" : "border-red-200 bg-red-50/95 text-red-950"}`}>
       {success ? <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-600" size={20} /> : <CircleAlert className="mt-0.5 shrink-0 text-red-600" size={20} />}
-      <p className="min-w-0 flex-1 text-sm font-semibold leading-5">{message}</p>
-      <button type="button" onClick={onClose} className="rounded-lg p-1 opacity-60 hover:bg-black/5 hover:opacity-100" aria-label="Cerrar notificación"><X size={16} /></button>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold leading-5">{message}</p>
+        {action && (
+          <button type="button" onClick={() => void action.onClick()} className="mt-2 rounded-lg bg-white/80 px-3 py-1.5 text-xs font-extrabold text-emerald-800 shadow-sm hover:bg-white">
+            {action.label}
+          </button>
+        )}
+      </div>
+      <button type="button" onClick={onClose} className="rounded-lg p-1 opacity-60 hover:bg-black/5 hover:opacity-100" aria-label="Cerrar notificacion"><X size={16} /></button>
       <span className={`absolute bottom-0 left-0 h-1 animate-[toast-life_5s_linear_forwards] rounded-b-2xl ${success ? "bg-emerald-500" : "bg-red-500"}`} />
     </div>
   );

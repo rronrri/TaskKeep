@@ -1,4 +1,4 @@
-import type { TaskPriority } from "@/types";
+﻿import type { TaskPriority } from "@/types";
 
 export const priorityStyles: Record<
   TaskPriority,
@@ -29,3 +29,4 @@ export const priorityStyles: Record<
     calendar: "#dc2626",
   },
 };
+

@@ -42,6 +42,7 @@ export const taskSchema = z.object({
   priority: z.enum(["low", "medium", "high", "critical"]),
   status: z.enum(["pending", "in_progress", "completed"]).default("pending"),
   is_pinned: z.boolean().default(false),
+  folder_id: z.string().uuid().nullable().optional(),
   reminder_mode: reminderModeSchema.default("none"),
   reminder_settings: reminderSettingsSchema,
 }).superRefine((value, context) => {

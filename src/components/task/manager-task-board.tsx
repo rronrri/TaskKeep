@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BellRing, CalendarClock, ChevronLeft, ChevronRight, Pencil, Pin, PinOff, Plus, Trash2 } from "lucide-react";
+import { BellRing, CalendarClock, ChevronLeft, ChevronRight, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import { format, isBefore } from "date-fns";
 import { es } from "date-fns/locale";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -11,10 +11,17 @@ import { TaskEditorDialog, type ResponsibleOption } from "./task-editor-dialog";
 import { TaskPreviewDialog } from "./task-preview-dialog";
 import { TaskTimingInfo } from "./task-timing-info";
 import { TaskFilters } from "./task-filters";
+import { TaskContextMenu } from "./task-context-menu";
 import { TaskFolderExplorer, type FolderSelection } from "./task-folder-explorer";
 import type { Task, TaskFolder, TaskStatus } from "@/types";
 
 interface Responsible extends ResponsibleOption { email: string; }
+
+const statusCardStyles: Record<TaskStatus, string> = {
+  pending: "border-amber-200 bg-amber-50/80",
+  in_progress: "border-indigo-200 bg-indigo-50/80",
+  completed: "border-emerald-200 bg-emerald-50/80",
+};
 
 export function ManagerTaskBoard() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -23,6 +30,7 @@ export function ManagerTaskBoard() {
   const [preview, setPreview] = useState<Task | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorMode, setEditorMode] = useState<"full" | "reminders">("full");
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
@@ -37,8 +45,11 @@ export function ManagerTaskBoard() {
   const [loading, setLoading] = useState(true);
   const [serverError, setServerError] = useState("");
   const [notice, setNotice] = useState("");
+  const [noticeAction, setNoticeAction] = useState<{ label: string; onClick: () => Promise<void> | void } | null>(null);
   const [folders, setFolders] = useState<TaskFolder[]>([]);
-  const [folderSelection, setFolderSelection] = useState<FolderSelection>("all");
+  const [folderSelection, setFolderSelection] = useState<FolderSelection>("none");
+  const [contextMenu, setContextMenu] = useState<{ task: Task; x: number; y: number } | null>(null);
+  const currentFolderId = folderSelection !== "all" && folderSelection !== "none" ? folderSelection : null;
 
   const loadTasks = useCallback(async () => {
     const query = new URLSearchParams({ size: "12", page: String(page), sort });
@@ -105,24 +116,73 @@ export function ManagerTaskBoard() {
     setNotice(parentId ? "Subcarpeta creada." : "Carpeta creada.");
   };
 
+  const deleteFolder = async (folder: TaskFolder) => {
+    const response = await fetch("/api/task-folders", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: folder.id }) });
+    const body = await response.json();
+    if (!response.ok) {
+      setServerError(body.error ?? "No se pudo eliminar la carpeta");
+      return;
+    }
+    const deletedIds = (body.data?.deleted_folder_ids ?? [folder.id]) as string[];
+    const snapshot = body.data?.snapshot;
+    setFolders((current) => current.filter((item) => !deletedIds.includes(item.id)));
+    if (folderSelection !== "all" && deletedIds.includes(folderSelection)) setFolderSelection("none");
+    await loadTasks();
+    setNotice("Carpeta eliminada.");
+    setNoticeAction(snapshot ? {
+      label: "Deshacer",
+      onClick: async () => {
+        const restoreResponse = await fetch("/api/task-folders", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(snapshot) });
+        const restoreBody = await restoreResponse.json();
+        if (!restoreResponse.ok) { setServerError(restoreBody.error ?? "No se pudo deshacer la eliminación"); return; }
+        setFolders(restoreBody.data ?? []);
+        setNoticeAction(null);
+        setNotice("Eliminación deshecha.");
+        await loadTasks();
+      },
+    } : null);
+  };
+
   const moveTaskToFolder = async (taskId: string, folderId: string | null) => {
     const response = await fetch(`/api/tasks/${taskId}/folder`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folder_id: folderId }) });
     const body = await response.json();
     if (!response.ok) { setServerError(body.error ?? "No se pudo mover la tarea"); return; }
     setTasks((current) => folderSelection === "all" ? current.map((task) => task.id === taskId ? { ...task, folder_id: folderId } : task) : current.filter((task) => task.id !== taskId));
-    setNotice(folderId ? "Tarea movida a la carpeta." : "Tarea movida a Sin carpeta.");
+    setNotice(folderId ? "Tarea movida a la carpeta." : "Tarea movida a Mi unidad.");
     void loadTasks().catch((error: unknown) => setServerError(error instanceof Error ? error.message : "No se pudieron actualizar las tareas"));
   };
 
   const openCreate = () => {
     setEditing(null);
+    setEditorMode("full");
     setEditorOpen(true);
   };
 
   const openEdit = (task: Task) => {
     setPreview(null);
     setEditing(task);
+    setEditorMode("full");
     setEditorOpen(true);
+  };
+
+  const openReminders = (task: Task) => {
+    setPreview(null);
+    setEditing(task);
+    setEditorMode("reminders");
+    setEditorOpen(true);
+  };
+
+  const openTaskMenu = (event: React.MouseEvent, task: Task) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({ task, x: event.clientX, y: event.clientY });
+  };
+
+  const moveContextTask = async (folderId: string | null) => {
+    if (!contextMenu) return;
+    const task = contextMenu.task;
+    setContextMenu(null);
+    await moveTaskToFolder(task.id, folderId);
   };
 
   const patchTask = async (task: Task, values: Partial<Pick<Task, "is_pinned" | "status" | "reminders_enabled">>, success: string) => {
@@ -152,26 +212,18 @@ export function ManagerTaskBoard() {
   };
 
   const actions = (task: Task) => (
-    <div className="flex gap-1" onClick={(event) => event.stopPropagation()}>
-      <button onClick={() => void patchTask(task, { is_pinned: !task.is_pinned }, task.is_pinned ? "Tarea desfijada." : "Tarea fijada.")} className="rounded-lg p-2 hover:bg-white/70" aria-label={task.is_pinned ? "Desfijar tarea" : "Fijar tarea"}>{task.is_pinned ? <PinOff size={17} /> : <Pin size={17} />}</button>
-      <button
-        onClick={() => openEdit(task)}
-        title="Configura avisos diarios, mensuales o por fecha límite. El predeterminado se adapta a la fecha."
-        aria-label="Activar recordatorios"
-        className={`rounded-lg p-2 hover:bg-white/70 ${task.reminders_enabled ? "text-amber-800" : ""}`}
-      >
-        <BellRing size={17} />
-      </button>
-      <button onClick={() => openEdit(task)} className="rounded-lg p-2 hover:bg-white/70" aria-label={`Editar ${task.title}`}><Pencil size={17} /></button>
-      <button onClick={() => setDeleteTarget(task)} className="rounded-lg p-2 text-red-700 hover:bg-red-50/70" aria-label={`Eliminar ${task.title}`}><Trash2 size={17} /></button>
+    <div className="flex shrink-0 items-center gap-0.5" onClick={(event) => event.stopPropagation()}>
+      <button onClick={() => void patchTask(task, { is_pinned: !task.is_pinned }, task.is_pinned ? "Tarea desfijada." : "Tarea fijada.")} className="rounded-lg p-1.5 hover:bg-white/70" aria-label={task.is_pinned ? "Desfijar tarea" : "Fijar tarea"}>{task.is_pinned ? <PinOff size={17} /> : <Pin size={17} />}</button>
+      <button onClick={() => openReminders(task)} title="Configura avisos diarios, mensuales o por fecha límite. El predeterminado se adapta a la fecha." aria-label="Activar recordatorios" className={`rounded-lg p-1.5 hover:bg-white/70 ${task.reminders_enabled ? "text-amber-800" : ""}`}><BellRing size={17} /></button>
+      <button onClick={() => openEdit(task)} className="rounded-lg p-1.5 hover:bg-white/70" aria-label={`Editar ${task.title}`}><Pencil size={17} /></button>
+      <button onClick={() => setDeleteTarget(task)} className="rounded-lg p-1.5 text-red-700 hover:bg-red-50/70" aria-label={`Eliminar ${task.title}`}><Trash2 size={17} /></button>
     </div>
   );
 
   return (
     <section>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="text-sm font-bold text-indigo-600">TABLERO</p><h1 className="font-display text-3xl font-extrabold">Tareas</h1><p className="mt-2 text-slate-600">Crea, asigna y controla el trabajo de tu empresa.</p></div>
-        <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white hover:bg-indigo-700"><Plus size={19} /> Nueva tarea</button>
+        <div><h1 className="font-display text-3xl font-extrabold">Tareas</h1></div>
       </div>
 
       <TaskFilters
@@ -198,33 +250,33 @@ export function ManagerTaskBoard() {
         onViewMode={setViewMode}
       />
 
-      <ToastMessages success={notice} error={serverError} onClearSuccess={() => setNotice("")} onClearError={() => setServerError("")} />
-      <div className="mt-6 grid items-start gap-5 lg:grid-cols-[250px_minmax(0,1fr)]">
-        <TaskFolderExplorer folders={folders} selected={folderSelection} onSelect={(folder) => { setPage(1); setFolderSelection(folder); }} onCreate={createFolder} onMoveTask={moveTaskToFolder} />
-        <div className="min-w-0">
-        {loading ? <div className="card p-10 text-center text-slate-500">Cargando tareas...</div> : tasks.length === 0 ? <div className="card p-10 text-center text-slate-500">No hay tareas para estos filtros.</div> : viewMode === "cards" ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <ToastMessages success={notice} error={serverError} successAction={noticeAction} onClearSuccess={() => { setNotice(""); setNoticeAction(null); }} onClearError={() => setServerError("")} />
+      <div className="mt-6">
+        <TaskFolderExplorer folders={folders} selected={folderSelection} taskCount={tasks.length} searchQuery={search} onSelect={(folder) => { setPage(1); setFolderSelection(folder); }} onCreate={createFolder} onDelete={deleteFolder} onMoveTask={moveTaskToFolder} onNewTask={openCreate}>
+        {loading ? <div className="col-span-full rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center text-slate-500">Cargando tareas...</div> : tasks.length === 0 ? <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-slate-500">No hay tareas para estos filtros.</div> : viewMode === "cards" ? (
+          <>
             {tasks.map((task) => {
               const overdue = Boolean(task.deadline) && task.status !== "completed" && isBefore(new Date(task.deadline!), new Date());
               const priority = priorityStyles[task.priority];
+              const cardStyle = statusCardStyles[task.status];
               return (
-                <article key={task.id} draggable onDragStart={(event) => { event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} onClick={() => setPreview(task)} className={`cursor-grab rounded-2xl border p-5 shadow-sm active:cursor-grabbing ${priority.card}`}>
-                  <div className="flex items-start justify-between gap-3"><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${priority.badge}`}>Prioridad {priority.label}</span>{actions(task)}</div>
-                  <div className="mt-4 block w-full text-left"><h2 className="font-display text-lg font-extrabold hover:text-indigo-700">{task.title}</h2>{task.description && <p className="mt-2 line-clamp-3 text-sm text-slate-700">{task.description}</p>}</div>
-                  <div className="mt-5 space-y-2 text-sm"><p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}><CalendarClock size={17} />{formatDeadline(task.deadline)}{overdue && " · Vencida"}</p><p>Responsable: <strong>{task.responsible?.full_name ?? "Sin nombre"}</strong></p></div>
+                <article key={task.id} draggable onContextMenu={(event) => openTaskMenu(event, task)} onDragStart={(event) => { event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} onClick={() => setPreview(task)} className={`cursor-grab rounded-2xl border p-3.5 shadow-sm active:cursor-grabbing ${cardStyle}`}>
+                  <div className="flex items-start justify-between gap-2"><span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-extrabold ${priority.badge}`}>{priority.label}</span>{actions(task)}</div>
+                  <div className="mt-2.5 block w-full text-left"><h2 className="font-display text-base font-extrabold hover:text-indigo-700">{task.title}</h2>{task.description && <p className="mt-1.5 line-clamp-2 text-xs text-slate-700">{task.description}</p>}</div>
+                  <div className="mt-3 space-y-1.5 text-xs"><p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}><CalendarClock size={17} />{formatDeadline(task.deadline)}{overdue && " · Vencida"}</p><p>Responsable: <strong>{task.responsible?.full_name ?? "Sin nombre"}</strong></p></div>
                   <TaskTimingInfo task={task} compact />
-                  <label onClick={(event) => event.stopPropagation()} className="mt-5 block border-t border-black/10 pt-4 text-xs font-bold uppercase tracking-wide">Estado<select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="mt-2 w-full rounded-lg border border-black/15 bg-white/75 px-3 py-2 text-sm normal-case"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></label>
+                  <label onClick={(event) => event.stopPropagation()} className="mt-3 block border-t border-black/10 pt-3 text-xs font-bold uppercase tracking-wide">Estado<select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="mt-2 w-full rounded-lg border border-black/15 bg-white/75 px-3 py-2 text-sm normal-case"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></label>
                 </article>
               );
             })}
-          </div>
+          </>
         ) : (
-          <div className="card overflow-x-auto">
+          <div className="col-span-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full min-w-[780px] text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-4">Tarea</th><th className="px-5 py-4">Responsable</th><th className="px-5 py-4">Fecha límite</th><th className="px-5 py-4">Estado</th><th className="px-5 py-4 text-right">Acciones</th></tr></thead>
               <tbody className="divide-y divide-slate-200">
                 {tasks.map((task) => { const priority = priorityStyles[task.priority]; return (
-                  <tr key={task.id} draggable onDragStart={(event) => { event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} onClick={() => setPreview(task)} className="cursor-grab hover:bg-slate-50 active:cursor-grabbing">
+                  <tr key={task.id} draggable onContextMenu={(event) => openTaskMenu(event, task)} onDragStart={(event) => { event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} onClick={() => setPreview(task)} className="cursor-grab hover:bg-slate-50 active:cursor-grabbing">
                     <td className="px-5 py-4"><div className="text-left"><p className="font-bold hover:text-indigo-700">{task.title}</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${priority.badge}`}>{priority.label}</span><TaskTimingInfo task={task} compact /></div></td>
                     <td className="px-5 py-4">{task.responsible?.full_name ?? "Sin nombre"}</td>
                     <td className="px-5 py-4">{formatDeadline(task.deadline)}</td>
@@ -236,13 +288,14 @@ export function ManagerTaskBoard() {
             </table>
           </div>
         )}
-        </div>
+        </TaskFolderExplorer>
       </div>
       {total > 12 && <div className="mt-6 flex items-center justify-between"><p className="text-sm text-slate-500">Página {page} de {Math.ceil(total / 12)} · {total} tareas</p><div className="flex gap-2"><button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="rounded-lg border border-slate-300 p-2 disabled:opacity-40" aria-label="Página anterior"><ChevronLeft size={19} /></button><button disabled={page >= Math.ceil(total / 12)} onClick={() => setPage((value) => value + 1)} className="rounded-lg border border-slate-300 p-2 disabled:opacity-40" aria-label="Página siguiente"><ChevronRight size={19} /></button></div></div>}
 
-      <TaskEditorDialog open={editorOpen} onOpenChange={setEditorOpen} task={editing} responsibles={responsibles} onSaved={async (message) => { setNotice(message); await loadTasks(); }} />
+      <TaskEditorDialog open={editorOpen} onOpenChange={setEditorOpen} task={editing} responsibles={responsibles} initialFolderId={currentFolderId} mode={editorMode} onSaved={async (message) => { setNotice(message); await loadTasks(); }} />
+      {contextMenu && <TaskContextMenu task={contextMenu.task} folders={folders} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onMove={moveContextTask} />}
       <TaskPreviewDialog task={preview} onOpenChange={(open) => !open && setPreview(null)} role="manager" onEdit={openEdit} onTogglePin={(task) => void patchTask(task, { is_pinned: !task.is_pinned }, task.is_pinned ? "Tarea desfijada." : "Tarea fijada.")} onDelete={(task) => { setPreview(null); setDeleteTarget(task); }} onStatusChange={(task, status) => void patchTask(task, { status }, "Estado actualizado.")} />
-      <ConfirmDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)} title="Eliminar tarea" description={`Se eliminará permanentemente “${deleteTarget?.title ?? ""}”.`} confirmLabel="Eliminar tarea" onConfirm={async () => { try { await removeTask(); } catch (error) { setServerError(error instanceof Error ? error.message : "No se pudo eliminar la tarea"); } }} />
+      <ConfirmDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)} title="Eliminar tarea" description={`Se eliminará permanentemente "${deleteTarget?.title ?? ""}".`} confirmLabel="Eliminar tarea" onConfirm={async () => { try { await removeTask(); } catch (error) { setServerError(error instanceof Error ? error.message : "No se pudo eliminar la tarea"); } }} />
     </section>
   );
 }

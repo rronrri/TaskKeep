@@ -1,11 +1,10 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Activity, BellRing, Building2, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, Settings, UserCircle, Users } from "lucide-react";
+import { Activity, BellRing, Building2, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, Settings, Users } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 import type { UserRole } from "@/types";
-import { LogoutButton } from "./logout-button";
+import { AccountMenu } from "./account-menu";
 
-const labels: Record<UserRole, string> = { admin: "Administrador/a", manager: "Gestor/a", collaborator: "Colaborador/a" };
 
 export async function AppShell({ role, children }: { role: UserRole; children: React.ReactNode }) {
   const user = await getSession();
@@ -21,11 +20,8 @@ export async function AppShell({ role, children }: { role: UserRole; children: R
     ...(role === "admin" ? [{ href: "/admin/logs", label: "Auditoría", icon: Activity }] : []),
     ...(role === "admin" ? [{ href: "/admin/notifications", label: "Recordatorios", icon: BellRing }] : []),
     ...(role === "admin" ? [{ href: "/admin/settings", label: "Configuración", icon: Settings }] : []),
-    { href: `/${role}/profile`, label: "Mi perfil", icon: UserCircle },
   ];
-  const links = user.mustChangePassword
-    ? [{ href: `/${role}/profile`, label: "Cambiar contraseña", icon: UserCircle }]
-    : regularLinks;
+  const links = user.mustChangePassword ? [] : regularLinks;
   return (
     <div className="min-h-screen md:grid md:grid-cols-[250px_1fr]">
       <aside className="border-b border-slate-200 bg-white p-5 md:min-h-screen md:border-b-0 md:border-r">
@@ -40,8 +36,8 @@ export async function AppShell({ role, children }: { role: UserRole; children: R
       </aside>
       <div>
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4 md:px-8">
-          <div><p className="font-bold">{user.fullName}</p><p className="text-xs text-slate-500">{labels[user.role]}</p></div>
-          <LogoutButton />
+          <div><p className="text-sm font-bold text-indigo-600">TaskKeep</p><p className="text-xs text-slate-500">Gestión de tareas</p></div>
+          <AccountMenu fullName={user.fullName} role={user.role} />
         </header>
         <main className="p-5 md:p-8">
           {user.mustChangePassword && (
@@ -55,3 +51,6 @@ export async function AppShell({ role, children }: { role: UserRole; children: R
     </div>
   );
 }
+
+
+

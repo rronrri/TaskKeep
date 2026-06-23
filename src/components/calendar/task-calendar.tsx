@@ -5,7 +5,7 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import esLocale from "@fullcalendar/core/locales/es";
-import { BellRing, CalendarDays, ChevronLeft, ChevronRight, Eye, Pin } from "lucide-react";
+import { BellRing, CalendarDays, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ToastMessages } from "@/components/ui/toast-message";
@@ -207,6 +207,33 @@ export function TaskCalendar() {
           )}
         </aside>
       </div>
+
+      <AppDialog open={dayEventsModalOpen} onOpenChange={setDayEventsModalOpen} title="Actividad del dia" description={new Date(`${selectedDate}T12:00:00`).toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" })} size="lg" scrollable={false}>
+        <div className="max-h-[60vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white">
+          <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.8fr)_minmax(8rem,0.7fr)_auto] gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-extrabold uppercase tracking-wide text-slate-500 md:grid">
+            <span>Tarea</span><span>Tipo y hora</span><span>Responsable</span><span>Prioridad</span>
+          </div>
+          <div className="divide-y divide-slate-200">
+            {selectedEvents.map((event) => {
+              const task = tasks.find((candidate) => candidate.id === event.taskId);
+              if (!task) return null;
+              const priority = priorityStyles[task.priority];
+              const isReminder = event.kind === "reminder";
+              return (
+                <button key={event.id} type="button" onClick={() => { setDayEventsModalOpen(false); setPreview(task); }} className={`grid w-full gap-2 px-4 py-3 text-left md:grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.8fr)_minmax(8rem,0.7fr)_auto] md:items-center md:gap-4 ${isReminder ? "hover:bg-amber-50/70" : "hover:bg-indigo-50/70"}`}>
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className={`rounded-lg p-2 ${isReminder ? "bg-amber-100 text-amber-700" : "bg-indigo-100 text-indigo-700"}`}>{isReminder ? <BellRing size={17} /> : <CalendarDays size={17} />}</span>
+                    <span className="min-w-0"><span className="block truncate font-bold text-slate-900">{task.title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">Abrir detalle de la tarea</span></span>
+                  </span>
+                  <span className={`text-sm font-semibold ${isReminder ? "text-amber-800" : "text-indigo-800"}`}>{isReminder ? "Recordatorio" : "Fecha limite"} · {new Date(event.start).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="truncate text-sm text-slate-600">{task.responsible?.full_name ?? "Sin nombre"}</span>
+                  <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-bold ${priority.badge}`}>{priority.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </AppDialog>
 
       <AppDialog open={recurringModalOpen} onOpenChange={(open) => { setRecurringModalOpen(open); if (!open && !preview && !editorOpen) setReturnToRecurring(false); }} title="Recordatorios recurrentes" description="Consulta todos los avisos diarios y mensuales activos. Pulsa uno para abrir la tarea." size="lg" scrollable={false}>
         <div className="max-h-[60vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white">

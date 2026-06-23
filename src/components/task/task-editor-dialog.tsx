@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { BellRing, Plus, Trash2 } from "lucide-react";
@@ -105,6 +105,8 @@ export function TaskEditorDialog({
   onSaved,
   actorRole = "manager",
   currentUserId,
+  initialFolderId = null,
+  mode = "full",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -113,6 +115,8 @@ export function TaskEditorDialog({
   onSaved: (message: string) => Promise<void> | void;
   actorRole?: UserRole;
   currentUserId?: string;
+  initialFolderId?: string | null;
+  mode?: "full" | "reminders";
 }) {
   const { register, handleSubmit, reset, setError, setValue, control, formState: { errors, isSubmitting } } = useForm<Input>({
     resolver: zodResolver(schema),
@@ -123,6 +127,7 @@ export function TaskEditorDialog({
   const deadline = useWatch({ control, name: "deadline" });
   const customDeadline = useWatch({ control, name: "custom_deadline" });
   const deadlineOffsets = useWatch({ control, name: "deadline_offsets" }) ?? [];
+  const remindersOnly = mode === "reminders" && Boolean(task);
 
   useEffect(() => {
     if (!open) return;
@@ -146,6 +151,7 @@ export function TaskEditorDialog({
         reminder_mode: values.reminder_mode,
         reminder_settings: buildReminderSettings(values),
         deadline: values.reminder_mode === "deadline" && values.deadline ? new Date(values.deadline).toISOString() : null,
+        folder_id: task ? undefined : initialFolderId,
       }),
     });
     const body = await response.json();
@@ -165,17 +171,30 @@ export function TaskEditorDialog({
   const usedOptions = new Set(deadlineOffsets.flatMap((item) => splitOption(item.value)));
   const minutesLeft = minutesUntil(deadline);
   const hasAvailableReminderOption = reminderOptions.some((option) => isOptionAvailable(option.value, usedOptions, [], minutesLeft));
+  const dialogTitle = remindersOnly ? "Recordatorios" : task ? "Editar tarea" : "Nueva tarea";
+  const dialogDescription = remindersOnly ? `Configura solo las alertas de "${task?.title ?? "esta tarea"}".` : actorRole === "collaborator" ? "Esta tarea sera personal y quedara asignada unicamente a ti." : "Completa los datos y configura avisos a tu medida.";
 
   return (
     <AppDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={task ? "Editar tarea" : "Nueva tarea"}
-      description={actorRole === "collaborator" ? "Esta tarea sera personal y quedara asignada unicamente a ti." : "Completa los datos y configura avisos a tu medida."}
+      title={dialogTitle}
+      description={dialogDescription}
       size="lg"
       scrollable={false}
     >
       <form onSubmit={handleSubmit(submit)} className="grid gap-3" noValidate>
+        {remindersOnly && (
+          <>
+            <input type="hidden" {...register("title")} />
+            <input type="hidden" {...register("description")} />
+            <input type="hidden" {...register("responsible_id")} />
+            <input type="hidden" {...register("priority")} />
+            <input type="hidden" {...register("status")} />
+          </>
+        )}
+        {!remindersOnly && (
+        <>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Titulo" error={errors.title?.message}>
             <input {...register("title")} className="w-full rounded-xl border border-slate-300 px-3 py-2" />
@@ -217,6 +236,22 @@ export function TaskEditorDialog({
             </div>
           </Field>
         </div>
+        </>
+        )}
+
+        {remindersOnly && (
+          <Field label="Recordatorio" error={errors.reminder_mode?.message}>
+            <div className="relative">
+              <BellRing className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-amber-700" size={17} />
+              <select {...register("reminder_mode")} className="w-full rounded-xl border border-amber-300 bg-amber-50 py-2 pl-10 pr-3 font-semibold text-amber-950">
+                <option value="none">Sin recordatorios</option>
+                <option value="daily">Una vez al dia</option>
+                <option value="monthly">Una vez al mes</option>
+                <option value="deadline">Establecer fecha limite</option>
+              </select>
+            </div>
+          </Field>
+        )}
 
         {(reminderMode === "daily" || reminderMode === "monthly") && (
           <div className="grid gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 md:grid-cols-2">
@@ -393,3 +428,4 @@ function toLocalDateTime(value: string) {
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
+

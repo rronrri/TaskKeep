@@ -70,6 +70,16 @@ export async function POST(request: Request) {
       .is("deleted_at", null)
       .maybeSingle();
     if (!responsible) return NextResponse.json({ error: "Responsable no válido" }, { status: 400 });
+    if (input.folder_id) {
+      const { data: folder, error: folderError } = await supabase
+        .from("task_folders")
+        .select("id")
+        .eq("id", input.folder_id)
+        .eq("company_id", auth.user.companyId!)
+        .maybeSingle();
+      if (folderError) throw folderError;
+      if (!folder) return NextResponse.json({ error: "Carpeta no encontrada" }, { status: 404 });
+    }
     const reminder = reminderFields(input.reminder_mode, input.deadline, input.reminder_settings);
     const { data, error } = await supabase
       .from("tasks")
