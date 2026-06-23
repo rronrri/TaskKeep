@@ -34,6 +34,16 @@ export interface Task {
   reminder_mode: ReminderMode;
   next_reminder_at: string | null;
   reminder_settings: ReminderSettings;
+  folder_id: string | null;
   created_at: string;
   responsible?: { full_name: string; email: string } | null;
+}
+
+export interface TaskFolder {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }

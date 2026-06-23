@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { taskSchema } from "@/lib/validators";
@@ -25,6 +25,9 @@ export async function GET(request: Request) {
     if (value) query = query.eq(key, value);
   }
   if (url.searchParams.get("pinned") === "true") query = query.eq("is_pinned", true);
+  const folderId = url.searchParams.get("folder_id");
+  if (folderId === "none") query = query.is("folder_id", null);
+  else if (folderId) query = query.eq("folder_id", folderId);
   const search = url.searchParams.get("q")?.trim();
   if (search) query = query.or(`title.ilike.%${search.replaceAll("%", "")}%,description.ilike.%${search.replaceAll("%", "")}%`);
   const deadlineFrom = url.searchParams.get("deadline_from");
@@ -74,25 +77,37 @@ export async function POST(request: Request) {
       .select()
       .single();
     if (error) throw error;
-    const { data: company } = await supabase
-      .from("companies")
-      .select("drive_folder_id,drive_owner_user_id")
-      .eq("id", auth.user.companyId!)
-      .maybeSingle();
-    if (company?.drive_folder_id && company.drive_owner_user_id) {
-      try {
-        const taskFolder = await createDriveFolder(taskFolderName(data.id, data.title), company.drive_folder_id, company.drive_owner_user_id);
-        await supabase.from("tasks").update({ drive_folder_id: taskFolder.id }).eq("id", data.id);
-        data.drive_folder_id = taskFolder.id;
-      } catch (driveError) {
-        console.error("No se pudo crear la carpeta de la tarea", driveError);
-      }
-    }
-    await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.created", entityType: "task", entityId: data.id, metadata: { title: data.title } });
-    await syncTaskReminders(data.id).catch((reminderError) => console.error("No se pudieron programar los recordatorios", reminderError));
+    after(async () => {
+      const results = await Promise.allSettled([
+        createTaskDriveFolder(data.id, data.title, auth.user.companyId!),
+        writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.created", entityType: "task", entityId: data.id, metadata: { title: data.title } }),
+        syncTaskReminders(data.id),
+      ]);
+      reportBackgroundFailures("crear tarea", results);
+    });
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) {
     return apiError(error);
+  }
+}
+
+async function createTaskDriveFolder(taskId: string, title: string, companyId: string) {
+  const supabase = createAdminClient();
+  const { data: company, error } = await supabase
+    .from("companies")
+    .select("drive_folder_id,drive_owner_user_id")
+    .eq("id", companyId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!company?.drive_folder_id || !company.drive_owner_user_id) return;
+  const taskFolder = await createDriveFolder(taskFolderName(taskId, title), company.drive_folder_id, company.drive_owner_user_id);
+  const { error: updateError } = await supabase.from("tasks").update({ drive_folder_id: taskFolder.id }).eq("id", taskId);
+  if (updateError) throw updateError;
+}
+
+function reportBackgroundFailures(context: string, results: PromiseSettledResult<unknown>[]) {
+  for (const result of results) {
+    if (result.status === "rejected") console.error(`Proceso posterior al ${context} falló`, result.reason);
   }
 }
 

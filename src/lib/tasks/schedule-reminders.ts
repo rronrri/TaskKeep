@@ -205,17 +205,13 @@ async function cancelScheduled(
     .select("id,provider_message_id,sent_at")
     .eq("task_id", taskId)
     .eq("status", "scheduled");
-  for (const row of rows ?? []) {
+  await Promise.allSettled((rows ?? []).map(async (row) => {
     // Si la hora de disparo ya pasó, Resend ya lo envió: no intentamos cancelar.
     const fireTime = row.sent_at ? new Date(row.sent_at).getTime() : 0;
     if (row.provider_message_id && fireTime > now.getTime()) {
-      try {
-        await client.resend.emails.cancel(row.provider_message_id);
-      } catch (error) {
-        console.error("No se pudo cancelar el recordatorio programado", error);
-      }
+      await client.resend.emails.cancel(row.provider_message_id);
     }
-  }
+  }));
   await supabase
     .from("notification_logs")
     .update({ status: "cancelled" })

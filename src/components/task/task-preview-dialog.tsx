@@ -7,6 +7,7 @@ import { es } from "date-fns/locale";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { priorityStyles } from "@/lib/tasks/priority-style";
 import type { Task, TaskStatus, UserRole } from "@/types";
+import { TaskTimingInfo } from "./task-timing-info";
 
 const statusLabels: Record<TaskStatus, string> = { pending: "Pendiente", in_progress: "En curso", completed: "Completada" };
 const requestLabels = { pending_review: "Pendiente de revisión", approved: "Aprobada", rejected: "Rechazada" };
@@ -206,6 +207,7 @@ export function TaskPreviewDialog({
           <p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}><CalendarClock size={18} /> {task.deadline ? format(new Date(task.deadline), "d MMM yyyy, HH:mm", { locale: es }) : "Sin fecha límite"}{overdue && " · Vencida"}</p>
           <p className="flex items-center gap-2"><UserRound size={18} /> {task.responsible?.full_name ?? "Responsable asignado"}</p>
         </div>
+        <TaskTimingInfo task={task} detailed />
       </div>
 
       {role === "manager" && (

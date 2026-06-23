@@ -5,11 +5,14 @@ import { BellRing, CalendarClock, ChevronLeft, ChevronRight, Pencil, Pin, PinOff
 import { format, isBefore } from "date-fns";
 import { es } from "date-fns/locale";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ToastMessages } from "@/components/ui/toast-message";
 import { priorityStyles } from "@/lib/tasks/priority-style";
 import { TaskEditorDialog, type ResponsibleOption } from "./task-editor-dialog";
 import { TaskPreviewDialog } from "./task-preview-dialog";
+import { TaskTimingInfo } from "./task-timing-info";
 import { TaskFilters } from "./task-filters";
-import type { Task, TaskStatus } from "@/types";
+import { TaskFolderExplorer, type FolderSelection } from "./task-folder-explorer";
+import type { Task, TaskFolder, TaskStatus } from "@/types";
 
 interface Responsible extends ResponsibleOption { email: string; }
 
@@ -34,6 +37,8 @@ export function ManagerTaskBoard() {
   const [loading, setLoading] = useState(true);
   const [serverError, setServerError] = useState("");
   const [notice, setNotice] = useState("");
+  const [folders, setFolders] = useState<TaskFolder[]>([]);
+  const [folderSelection, setFolderSelection] = useState<FolderSelection>("all");
 
   const loadTasks = useCallback(async () => {
     const query = new URLSearchParams({ size: "12", page: String(page), sort });
@@ -44,13 +49,14 @@ export function ManagerTaskBoard() {
     if (search.trim()) query.set("q", search.trim());
     if (deadlineFrom) query.set("deadline_from", deadlineFrom);
     if (deadlineTo) query.set("deadline_to", deadlineTo);
+    if (folderSelection !== "all") query.set("folder_id", folderSelection);
     const response = await fetch(`/api/tasks?${query}`, { cache: "no-store" });
     const body = await response.json();
     if (!response.ok) throw new Error(body.error ?? "No se pudieron cargar las tareas");
     setTasks(body.data ?? []);
     setTotal(body.pagination?.total ?? 0);
     setPreview((current) => current ? (body.data ?? []).find((task: Task) => task.id === current.id) ?? null : null);
-  }, [deadlineFrom, deadlineTo, page, pinnedFilter, priorityFilter, responsibleFilter, search, sort, statusFilter]);
+  }, [deadlineFrom, deadlineTo, folderSelection, page, pinnedFilter, priorityFilter, responsibleFilter, search, sort, statusFilter]);
 
   useEffect(() => {
     const query = new URLSearchParams({ size: "12", page: String(page), sort });
@@ -61,20 +67,25 @@ export function ManagerTaskBoard() {
     if (search.trim()) query.set("q", search.trim());
     if (deadlineFrom) query.set("deadline_from", deadlineFrom);
     if (deadlineTo) query.set("deadline_to", deadlineTo);
+    if (folderSelection !== "all") query.set("folder_id", folderSelection);
     Promise.all([
       fetch(`/api/tasks?${query}`, { cache: "no-store" }),
       fetch("/api/admin/users", { cache: "no-store" }),
       fetch("/api/auth/me", { cache: "no-store" }),
+      fetch("/api/task-folders", { cache: "no-store" }),
     ])
-      .then(async ([tasksResponse, usersResponse, meResponse]) => {
+      .then(async ([tasksResponse, usersResponse, meResponse, foldersResponse]) => {
         const tasksBody = await tasksResponse.json();
         const usersBody = await usersResponse.json();
         const meBody = await meResponse.json();
+        const foldersBody = await foldersResponse.json();
         if (!tasksResponse.ok) throw new Error(tasksBody.error ?? "No se pudieron cargar las tareas");
         if (!usersResponse.ok) throw new Error(usersBody.error ?? "No se pudieron cargar los responsables");
         if (!meResponse.ok) throw new Error(meBody.error ?? "No se pudo cargar la sesión");
+        if (!foldersResponse.ok) throw new Error(foldersBody.error ?? "No se pudieron cargar las carpetas");
         setTasks(tasksBody.data ?? []);
         setTotal(tasksBody.pagination?.total ?? 0);
+        setFolders(foldersBody.data ?? []);
         const requestedTask = new URLSearchParams(window.location.search).get("task");
         if (requestedTask) setPreview((tasksBody.data ?? []).find((task: Task) => task.id === requestedTask) ?? null);
         setResponsibles([
@@ -84,7 +95,24 @@ export function ManagerTaskBoard() {
       })
       .catch((error: unknown) => setServerError(error instanceof Error ? error.message : "No se pudieron cargar los datos"))
       .finally(() => setLoading(false));
-  }, [deadlineFrom, deadlineTo, page, pinnedFilter, priorityFilter, responsibleFilter, search, sort, statusFilter]);
+  }, [deadlineFrom, deadlineTo, folderSelection, page, pinnedFilter, priorityFilter, responsibleFilter, search, sort, statusFilter]);
+
+  const createFolder = async (name: string, parentId: string | null) => {
+    const response = await fetch("/api/task-folders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: parentId }) });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error ?? "No se pudo crear la carpeta");
+    setFolders((current) => [...current, body.data].sort((a, b) => a.name.localeCompare(b.name)));
+    setNotice(parentId ? "Subcarpeta creada." : "Carpeta creada.");
+  };
+
+  const moveTaskToFolder = async (taskId: string, folderId: string | null) => {
+    const response = await fetch(`/api/tasks/${taskId}/folder`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folder_id: folderId }) });
+    const body = await response.json();
+    if (!response.ok) { setServerError(body.error ?? "No se pudo mover la tarea"); return; }
+    setTasks((current) => folderSelection === "all" ? current.map((task) => task.id === taskId ? { ...task, folder_id: folderId } : task) : current.filter((task) => task.id !== taskId));
+    setNotice(folderId ? "Tarea movida a la carpeta." : "Tarea movida a Sin carpeta.");
+    void loadTasks().catch((error: unknown) => setServerError(error instanceof Error ? error.message : "No se pudieron actualizar las tareas"));
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -170,19 +198,21 @@ export function ManagerTaskBoard() {
         onViewMode={setViewMode}
       />
 
-      {serverError && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800">{serverError}</p>}
-      {notice && <p role="status" className="mt-4 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{notice}</p>}
-      <div className="mt-6">
+      <ToastMessages success={notice} error={serverError} onClearSuccess={() => setNotice("")} onClearError={() => setServerError("")} />
+      <div className="mt-6 grid items-start gap-5 lg:grid-cols-[250px_minmax(0,1fr)]">
+        <TaskFolderExplorer folders={folders} selected={folderSelection} onSelect={(folder) => { setPage(1); setFolderSelection(folder); }} onCreate={createFolder} onMoveTask={moveTaskToFolder} />
+        <div className="min-w-0">
         {loading ? <div className="card p-10 text-center text-slate-500">Cargando tareas...</div> : tasks.length === 0 ? <div className="card p-10 text-center text-slate-500">No hay tareas para estos filtros.</div> : viewMode === "cards" ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {tasks.map((task) => {
               const overdue = Boolean(task.deadline) && task.status !== "completed" && isBefore(new Date(task.deadline!), new Date());
               const priority = priorityStyles[task.priority];
               return (
-                <article key={task.id} onClick={() => setPreview(task)} className={`cursor-pointer rounded-2xl border p-5 shadow-sm ${priority.card}`}>
+                <article key={task.id} draggable onDragStart={(event) => { event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} onClick={() => setPreview(task)} className={`cursor-grab rounded-2xl border p-5 shadow-sm active:cursor-grabbing ${priority.card}`}>
                   <div className="flex items-start justify-between gap-3"><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${priority.badge}`}>Prioridad {priority.label}</span>{actions(task)}</div>
                   <div className="mt-4 block w-full text-left"><h2 className="font-display text-lg font-extrabold hover:text-indigo-700">{task.title}</h2>{task.description && <p className="mt-2 line-clamp-3 text-sm text-slate-700">{task.description}</p>}</div>
                   <div className="mt-5 space-y-2 text-sm"><p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}><CalendarClock size={17} />{formatDeadline(task.deadline)}{overdue && " · Vencida"}</p><p>Responsable: <strong>{task.responsible?.full_name ?? "Sin nombre"}</strong></p></div>
+                  <TaskTimingInfo task={task} compact />
                   <label onClick={(event) => event.stopPropagation()} className="mt-5 block border-t border-black/10 pt-4 text-xs font-bold uppercase tracking-wide">Estado<select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="mt-2 w-full rounded-lg border border-black/15 bg-white/75 px-3 py-2 text-sm normal-case"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></label>
                 </article>
               );
@@ -194,8 +224,8 @@ export function ManagerTaskBoard() {
               <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-4">Tarea</th><th className="px-5 py-4">Responsable</th><th className="px-5 py-4">Fecha límite</th><th className="px-5 py-4">Estado</th><th className="px-5 py-4 text-right">Acciones</th></tr></thead>
               <tbody className="divide-y divide-slate-200">
                 {tasks.map((task) => { const priority = priorityStyles[task.priority]; return (
-                  <tr key={task.id} onClick={() => setPreview(task)} className="cursor-pointer hover:bg-slate-50">
-                    <td className="px-5 py-4"><div className="text-left"><p className="font-bold hover:text-indigo-700">{task.title}</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${priority.badge}`}>{priority.label}</span></div></td>
+                  <tr key={task.id} draggable onDragStart={(event) => { event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} onClick={() => setPreview(task)} className="cursor-grab hover:bg-slate-50 active:cursor-grabbing">
+                    <td className="px-5 py-4"><div className="text-left"><p className="font-bold hover:text-indigo-700">{task.title}</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${priority.badge}`}>{priority.label}</span><TaskTimingInfo task={task} compact /></div></td>
                     <td className="px-5 py-4">{task.responsible?.full_name ?? "Sin nombre"}</td>
                     <td className="px-5 py-4">{formatDeadline(task.deadline)}</td>
                     <td className="px-5 py-4" onClick={(event) => event.stopPropagation()}><select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></td>
@@ -206,6 +236,7 @@ export function ManagerTaskBoard() {
             </table>
           </div>
         )}
+        </div>
       </div>
       {total > 12 && <div className="mt-6 flex items-center justify-between"><p className="text-sm text-slate-500">Página {page} de {Math.ceil(total / 12)} · {total} tareas</p><div className="flex gap-2"><button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="rounded-lg border border-slate-300 p-2 disabled:opacity-40" aria-label="Página anterior"><ChevronLeft size={19} /></button><button disabled={page >= Math.ceil(total / 12)} onClick={() => setPage((value) => value + 1)} className="rounded-lg border border-slate-300 p-2 disabled:opacity-40" aria-label="Página siguiente"><ChevronRight size={19} /></button></div></div>}
 

@@ -1,48 +1,62 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import esLocale from "@fullcalendar/core/locales/es";
-import { CalendarDays, Pin } from "lucide-react";
+import { BellRing, CalendarDays, ChevronLeft, ChevronRight, Eye, Pin } from "lucide-react";
+import { AppDialog } from "@/components/ui/app-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ToastMessages } from "@/components/ui/toast-message";
 import { priorityStyles } from "@/lib/tasks/priority-style";
 import { TaskEditorDialog, type ResponsibleOption } from "@/components/task/task-editor-dialog";
 import { TaskPreviewDialog } from "@/components/task/task-preview-dialog";
 import type { SessionUser, Task, TaskStatus } from "@/types";
 
+type CalendarTaskEvent = {
+  id: string;
+  title: string;
+  start: string;
+  color: string;
+  textColor: string;
+  taskId: string;
+  kind: "reminder" | "deadline";
+};
+
 export function TaskCalendar() {
+  const calendarRef = useRef<FullCalendar | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [session, setSession] = useState<SessionUser | null>(null);
   const [responsibles, setResponsibles] = useState<ResponsibleOption[]>([]);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(() => localDateKey(new Date()));
   const [preview, setPreview] = useState<Task | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [serverError, setServerError] = useState("");
   const [notice, setNotice] = useState("");
+  const [calendarTitle, setCalendarTitle] = useState("");
+  const [visibleRange, setVisibleRange] = useState(() => monthRange(new Date()));
+  const [recurringModalOpen, setRecurringModalOpen] = useState(false);
+  const [dayEventsModalOpen, setDayEventsModalOpen] = useState(false);
+  const [returnToRecurring, setReturnToRecurring] = useState(false);
 
   const loadTasks = useCallback(async () => {
-    const response = await fetch("/api/tasks?size=100", { cache: "no-store" });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error ?? "No se pudieron cargar las tareas");
-    setTasks(body.data ?? []);
-    setPreview((current) => current ? (body.data ?? []).find((task: Task) => task.id === current.id) ?? null : null);
+    const allTasks = await fetchCalendarTasks();
+    setTasks(allTasks);
+    setPreview((current) => current ? allTasks.find((task) => task.id === current.id) ?? null : null);
   }, []);
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/tasks?size=100", { cache: "no-store" }),
+      fetchCalendarTasks(),
       fetch("/api/auth/me", { cache: "no-store" }),
     ])
-      .then(async ([tasksResponse, meResponse]) => {
-        const tasksBody = await tasksResponse.json();
+      .then(async ([allTasks, meResponse]) => {
         const meBody = await meResponse.json();
-        if (!tasksResponse.ok) throw new Error(tasksBody.error ?? "No se pudieron cargar las tareas");
         if (!meResponse.ok) throw new Error(meBody.error ?? "No se pudo cargar la sesión");
-        setTasks(tasksBody.data ?? []);
+        setTasks(allTasks);
         setSession(meBody.user);
         if (meBody.user.role === "manager") {
           const usersResponse = await fetch("/api/admin/users", { cache: "no-store" });
@@ -57,14 +71,29 @@ export function TaskCalendar() {
       .catch((error: unknown) => setServerError(error instanceof Error ? error.message : "No se pudo cargar el calendario"));
   }, []);
 
-  const events = useMemo(() => tasks.filter((task) => task.deadline).map((task) => ({
-    id: task.id,
-    title: task.title,
-    date: task.deadline!.slice(0, 10),
-    color: priorityStyles[task.priority].calendar,
-  })), [tasks]);
+  const events = useMemo(
+    () => buildCalendarEvents(tasks, visibleRange.start, visibleRange.end),
+    [tasks, visibleRange],
+  );
 
-  const selectedTasks = useMemo(() => tasks.filter((task) => task.deadline?.slice(0, 10) === selectedDate), [selectedDate, tasks]);
+  const selectedEvents = useMemo(
+    () => [
+      ...events.filter((event) => localDateKey(new Date(event.start)) === selectedDate),
+      ...buildRecurringEventsForDate(tasks, selectedDate),
+    ].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()),
+    [events, selectedDate, tasks],
+  );
+  const recurringTasks = useMemo(
+    () => tasks.filter((task) => task.reminders_enabled && (task.reminder_mode === "daily" || task.reminder_mode === "monthly") && task.status !== "completed"),
+    [tasks],
+  );
+
+  const moveCalendar = (direction: "prev" | "next" | "today") => {
+    const api = calendarRef.current?.getApi();
+    if (!api) return;
+    api[direction]();
+    setSelectedDate(localDateKey(api.getDate()));
+  };
 
   const patchTask = async (task: Task, values: Partial<Pick<Task, "is_pinned" | "status">>, message: string) => {
     const response = await fetch(`/api/tasks/${task.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
@@ -98,49 +127,111 @@ export function TaskCalendar() {
     setEditorOpen(true);
   };
 
+  const openRecurringTask = (task: Task) => {
+    setRecurringModalOpen(false);
+    setReturnToRecurring(true);
+    setPreview(task);
+  };
+
+  const closeTaskPreview = (open: boolean) => {
+    if (open) return;
+    setPreview(null);
+    if (returnToRecurring) setRecurringModalOpen(true);
+  };
+
+  const changeEditorOpen = (open: boolean) => {
+    setEditorOpen(open);
+    if (!open && returnToRecurring) setRecurringModalOpen(true);
+  };
+
   return (
     <section>
       <p className="text-sm font-bold text-indigo-600">PLANIFICACIÓN</p>
       <h1 className="font-display text-3xl font-extrabold">Calendario</h1>
       <p className="mt-2 text-slate-600">Selecciona un día para previsualizar sus tareas o pulsa un evento para abrirlo.</p>
-      {serverError && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800">{serverError}</p>}
-      {notice && <p role="status" className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{notice}</p>}
+      <ToastMessages success={notice} error={serverError} onClearSuccess={() => setNotice("")} onClearError={() => setServerError("")} />
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="card overflow-hidden p-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <h2 className="font-display text-xl font-extrabold capitalize">{calendarTitle}</h2>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => moveCalendar("today")} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold hover:bg-slate-50">Hoy</button>
+              <button type="button" onClick={() => moveCalendar("prev")} className="rounded-xl border border-slate-300 bg-white p-2.5 hover:bg-slate-50" aria-label="Mes anterior"><ChevronLeft size={19} /></button>
+              <button type="button" onClick={() => moveCalendar("next")} className="rounded-xl border border-slate-300 bg-white p-2.5 hover:bg-slate-50" aria-label="Mes siguiente"><ChevronRight size={19} /></button>
+            </div>
+          </div>
+          <div className="mb-4 flex flex-wrap gap-4 text-xs font-semibold text-slate-600">
+            <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-indigo-600" /> Fechas límite</span>
+            <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-600" /> Avisos puntuales</span>
+            <span className="text-slate-400">Los recordatorios recurrentes están resumidos a la derecha.</span>
+          </div>
           <FullCalendar
+            ref={calendarRef}
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             locale={esLocale}
             events={events}
+            headerToolbar={false}
             height="auto"
-            dayMaxEvents={3}
+            dayMaxEvents={2}
+            displayEventTime
+            eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
+            datesSet={(info) => {
+              setCalendarTitle(info.view.title);
+              setVisibleRange({ start: info.start, end: info.end });
+            }}
             dateClick={(info) => setSelectedDate(info.dateStr)}
             eventClick={(info) => {
-              const task = tasks.find((candidate) => candidate.id === info.event.id);
+              const task = tasks.find((candidate) => candidate.id === info.event.extendedProps.taskId);
               if (task) setPreview(task);
             }}
           />
         </div>
         <aside className="card h-fit p-5">
           <div className="flex items-center gap-3"><span className="rounded-xl bg-indigo-100 p-2 text-indigo-700"><CalendarDays size={20} /></span><div><p className="text-xs font-bold uppercase text-slate-500">Vista previa</p><h2 className="font-display font-extrabold">{new Date(`${selectedDate}T12:00:00`).toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" })}</h2></div></div>
-          <div className="mt-4 space-y-3">
-            {selectedTasks.length === 0 ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No hay tareas para este día.</p> : selectedTasks.map((task) => {
-              const priority = priorityStyles[task.priority];
-              return (
-                <button key={task.id} onClick={() => setPreview(task)} className={`w-full rounded-xl border p-3 text-left hover:shadow-sm ${priority.card}`}>
-                  <div className="flex items-start justify-between gap-2"><p className="font-bold">{task.title}</p>{task.is_pinned && <Pin size={15} />}</div>
-                  <p className="mt-1 text-xs text-slate-600">{new Date(task.deadline!).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" })} · {task.responsible?.full_name ?? "Responsable"}</p>
-                </button>
-              );
-            })}
-          </div>
+          {recurringTasks.length > 0 && (
+            <button type="button" onClick={() => setRecurringModalOpen(true)} className="mt-5 flex w-full items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-left hover:border-amber-300 hover:bg-amber-100/70">
+              <span className="rounded-xl bg-white p-2 text-amber-700"><BellRing size={19} /></span>
+              <span className="min-w-0 flex-1"><span className="block text-xs font-extrabold uppercase text-amber-800">Recordatorios recurrentes</span><span className="mt-1 block text-sm text-slate-700">{recurringTasks.length} {recurringTasks.length === 1 ? "recordatorio activo" : "recordatorios activos"}</span></span>
+              <Eye className="shrink-0 text-amber-800" size={20} aria-hidden="true" />
+            </button>
+          )}
+          <p className="mt-5 text-xs font-extrabold uppercase text-slate-500">En este día</p>
+          {selectedEvents.length === 0 ? <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No hay tareas ni recordatorios para este día.</p> : (
+            <button type="button" onClick={() => setDayEventsModalOpen(true)} className="mt-4 flex w-full items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-left hover:border-indigo-300 hover:bg-indigo-100/70">
+              <span className="rounded-xl bg-white p-2 text-indigo-700"><CalendarDays size={19} /></span>
+              <span className="min-w-0 flex-1"><span className="block text-xs font-extrabold uppercase text-indigo-800">Actividad del día</span><span className="mt-1 block text-sm text-slate-700">{selectedEvents.length} {selectedEvents.length === 1 ? "elemento" : "elementos"}</span></span>
+              <Eye className="shrink-0 text-indigo-800" size={20} aria-hidden="true" />
+            </button>
+          )}
         </aside>
       </div>
 
+      <AppDialog open={recurringModalOpen} onOpenChange={(open) => { setRecurringModalOpen(open); if (!open && !preview && !editorOpen) setReturnToRecurring(false); }} title="Recordatorios recurrentes" description="Consulta todos los avisos diarios y mensuales activos. Pulsa uno para abrir la tarea." size="lg" scrollable={false}>
+        <div className="max-h-[60vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white">
+          <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.8fr)_minmax(8rem,0.7fr)_auto] gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-extrabold uppercase tracking-wide text-slate-500 md:grid">
+            <span>Tarea</span><span>Frecuencia</span><span>Responsable</span><span>Prioridad</span>
+          </div>
+          <div className="divide-y divide-slate-200">
+          {recurringTasks.map((task) => {
+            const priority = priorityStyles[task.priority];
+            return (
+              <button key={task.id} type="button" onClick={() => openRecurringTask(task)} className="grid w-full gap-2 px-4 py-3 text-left hover:bg-amber-50/60 md:grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.8fr)_minmax(8rem,0.7fr)_auto] md:items-center md:gap-4">
+                <span className="flex min-w-0 items-center gap-3"><span className="rounded-lg bg-amber-100 p-2 text-amber-700"><BellRing size={17} /></span><span className="min-w-0"><span className="block truncate font-bold text-slate-900">{task.title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">Abrir detalle de la tarea</span></span></span>
+                <span className="text-sm font-semibold text-amber-800">{recurringLabel(task)}</span>
+                <span className="truncate text-sm text-slate-600">{task.responsible?.full_name ?? "Sin nombre"}</span>
+                <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-bold ${priority.badge}`}>{priority.label}</span>
+              </button>
+            );
+          })}
+          </div>
+        </div>
+      </AppDialog>
+
       <TaskPreviewDialog
         task={preview}
-        onOpenChange={(open) => !open && setPreview(null)}
+        onOpenChange={closeTaskPreview}
         role={session?.role === "manager" ? "manager" : "collaborator"}
         onEdit={openEdit}
         onTogglePin={(task) => void patchTask(task, { is_pinned: !task.is_pinned }, task.is_pinned ? "Tarea desfijada." : "Tarea fijada.")}
@@ -148,8 +239,106 @@ export function TaskCalendar() {
         onStatusChange={(task, status) => void patchTask(task, { status }, "Estado actualizado.")}
         onRequestStatus={(task, status) => void requestStatus(task, status)}
       />
-      <TaskEditorDialog open={editorOpen} onOpenChange={setEditorOpen} task={editing} responsibles={responsibles} onSaved={async (message) => { setNotice(message); await loadTasks(); }} />
+      <TaskEditorDialog open={editorOpen} onOpenChange={changeEditorOpen} task={editing} responsibles={responsibles} onSaved={async (message) => { setNotice(message); await loadTasks(); }} />
       <ConfirmDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)} title="Eliminar tarea" description={`Se eliminará permanentemente “${deleteTarget?.title ?? ""}”.`} confirmLabel="Eliminar tarea" onConfirm={async () => { try { await removeTask(); } catch (error) { setServerError(error instanceof Error ? error.message : "No se pudo eliminar la tarea"); } }} />
     </section>
   );
+}
+
+async function fetchCalendarTasks() {
+  const firstResponse = await fetch("/api/tasks?size=50&page=1&sort=deadline_asc", { cache: "no-store" });
+  const firstBody = await firstResponse.json();
+  if (!firstResponse.ok) throw new Error(firstBody.error ?? "No se pudieron cargar las tareas");
+  const total = Number(firstBody.pagination?.total ?? 0);
+  const pages = Math.ceil(total / 50);
+  if (pages <= 1) return (firstBody.data ?? []) as Task[];
+  const remaining = await Promise.all(Array.from({ length: pages - 1 }, async (_, index) => {
+    const response = await fetch(`/api/tasks?size=50&page=${index + 2}&sort=deadline_asc`, { cache: "no-store" });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error ?? "No se pudieron cargar las tareas");
+    return (body.data ?? []) as Task[];
+  }));
+  return [...(firstBody.data ?? []), ...remaining.flat()] as Task[];
+}
+
+function localDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function monthRange(date: Date) {
+  return {
+    start: new Date(date.getFullYear(), date.getMonth(), 1),
+    end: new Date(date.getFullYear(), date.getMonth() + 1, 1),
+  };
+}
+
+function buildCalendarEvents(tasks: Task[], rangeStart: Date, rangeEnd: Date) {
+  const events: CalendarTaskEvent[] = [];
+  for (const task of tasks) {
+    if (task.deadline) {
+      const deadline = new Date(task.deadline);
+      if (insideRange(deadline, rangeStart, rangeEnd)) {
+        events.push(calendarEvent(task, deadline, "deadline"));
+      }
+    }
+    if (!task.reminders_enabled || task.reminder_mode === "none" || task.status === "completed") continue;
+
+    if (task.reminder_mode === "deadline" && task.deadline) {
+      const deadline = new Date(task.deadline).getTime();
+      for (const minutes of task.reminder_settings?.deadline_offsets ?? []) {
+        const occurrence = new Date(deadline - minutes * 60_000);
+        if (occurrence >= new Date(task.created_at) && insideRange(occurrence, rangeStart, rangeEnd)) {
+          events.push(calendarEvent(task, occurrence, "reminder"));
+        }
+      }
+    }
+  }
+  return events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+}
+
+function buildRecurringEventsForDate(tasks: Task[], dateKey: string) {
+  const [year, monthValue, day] = dateKey.split("-").map(Number);
+  const month = monthValue - 1;
+  return tasks.flatMap((task) => {
+    if (!task.reminders_enabled || task.status === "completed" || (task.reminder_mode !== "daily" && task.reminder_mode !== "monthly")) return [];
+    if (task.reminder_mode === "monthly" && day !== clampDay(year, month, task.reminder_settings?.monthly_day ?? 1)) return [];
+    const [hour, minute] = (task.reminder_settings?.recurring_time ?? "09:00").split(":").map(Number);
+    const occurrence = localToUtc(year, month, day, hour, minute, task.reminder_settings?.timezone_offset_minutes ?? 0);
+    if (occurrence < new Date(task.created_at)) return [];
+    return [calendarEvent(task, occurrence, "reminder")];
+  });
+}
+
+function recurringLabel(task: Task) {
+  const time = task.reminder_settings?.recurring_time ?? "09:00";
+  return task.reminder_mode === "daily"
+    ? `Todos los días · ${time}`
+    : `Día ${task.reminder_settings?.monthly_day ?? 1} de cada mes · ${time}`;
+}
+
+function calendarEvent(task: Task, date: Date, kind: "reminder" | "deadline"): CalendarTaskEvent {
+  return {
+    id: `${task.id}:${kind}:${date.getTime()}`,
+    title: `${kind === "reminder" ? "Recordatorio" : "Fecha límite"}: ${task.title}`,
+    start: date.toISOString(),
+    color: kind === "reminder" ? "#d97706" : priorityStyles[task.priority].calendar,
+    textColor: "#ffffff",
+    taskId: task.id,
+    kind,
+  };
+}
+
+function localToUtc(year: number, month: number, day: number, hour: number, minute: number, offset: number) {
+  return new Date(Date.UTC(year, month, day, hour, minute) + offset * 60_000);
+}
+
+function clampDay(year: number, month: number, day: number) {
+  return Math.min(Math.max(day, 1), new Date(Date.UTC(year, month + 1, 0)).getUTCDate());
+}
+
+function insideRange(date: Date, start: Date, end: Date) {
+  return date >= start && date < end;
 }

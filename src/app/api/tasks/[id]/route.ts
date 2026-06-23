@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { updateTaskSchema } from "@/lib/validators";
@@ -67,7 +67,7 @@ export async function PATCH(request: Request, context: Context) {
   const response = await applyTaskUpdate(request, auth.user, id);
   // Reconciliamos los recordatorios programados solo si la actualización tuvo éxito.
   if (response.status < 300) {
-    await syncTaskReminders(id).catch((error) => console.error("No se pudieron reprogramar los recordatorios", error));
+    defer("reprogramar los recordatorios", () => syncTaskReminders(id));
   }
   return response;
 }
@@ -112,7 +112,7 @@ async function applyTaskUpdate(request: Request, user: SessionUser, id: string) 
           source: "collaborator_self_direct",
         });
       }
-      await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.updated", entityType: "task", entityId: id });
+      defer("registrar la edición en auditoría", () => writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.updated", entityType: "task", entityId: id }));
       return NextResponse.json({ data });
     }
     if (normalized.responsible_id) {
@@ -139,7 +139,7 @@ async function applyTaskUpdate(request: Request, user: SessionUser, id: string) 
       const rest = { ...normalized };
       delete rest.status;
       if (Object.keys(rest).length === 0) {
-        await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.status_updated", entityType: "task", entityId: id, metadata: { status: normalized.status } });
+        defer("registrar el estado en auditoría", () => writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.status_updated", entityType: "task", entityId: id, metadata: { status: normalized.status } }));
         return NextResponse.json({ data });
       }
       const { data: updated, error: updateError } = await supabase
@@ -151,7 +151,7 @@ async function applyTaskUpdate(request: Request, user: SessionUser, id: string) 
         .select()
         .single();
       if (updateError) throw updateError;
-      await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.updated", entityType: "task", entityId: id });
+      defer("registrar la edición en auditoría", () => writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.updated", entityType: "task", entityId: id }));
       return NextResponse.json({ data: updated });
     }
     const { data, error } = await supabase
@@ -163,7 +163,7 @@ async function applyTaskUpdate(request: Request, user: SessionUser, id: string) 
       .select()
       .single();
     if (error) throw error;
-    await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.updated", entityType: "task", entityId: id });
+    defer("registrar la edición en auditoría", () => writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.updated", entityType: "task", entityId: id }));
     return NextResponse.json({ data });
   } catch (error) {
     return apiError(error);
@@ -186,7 +186,22 @@ export async function DELETE(_: Request, context: Context) {
   const { data, error } = await query.select("id").maybeSingle();
   if (error) return apiError(error);
   if (!data) return NextResponse.json({ error: "Solo puedes eliminar tareas creadas por ti" }, { status: 403 });
-  await cancelTaskReminders(id).catch((error) => console.error("No se pudieron cancelar los recordatorios", error));
-  await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.deleted", entityType: "task", entityId: id });
+  defer("finalizar la eliminación", async () => {
+    const results = await Promise.allSettled([
+      cancelTaskReminders(id),
+      writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.deleted", entityType: "task", entityId: id }),
+    ]);
+    for (const result of results) if (result.status === "rejected") console.error("Proceso posterior a eliminar tarea falló", result.reason);
+  });
   return NextResponse.json({ ok: true });
+}
+
+function defer(label: string, operation: () => Promise<unknown>) {
+  after(async () => {
+    try {
+      await operation();
+    } catch (error) {
+      console.error(`No se pudo ${label}`, error);
+    }
+  });
 }

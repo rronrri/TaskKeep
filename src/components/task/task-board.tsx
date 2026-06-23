@@ -5,11 +5,14 @@ import { BellRing, CalendarClock, ChevronLeft, ChevronRight, Pencil, Pin, Plus, 
 import { format, isBefore } from "date-fns";
 import { es } from "date-fns/locale";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ToastMessages } from "@/components/ui/toast-message";
 import { priorityStyles } from "@/lib/tasks/priority-style";
 import { TaskEditorDialog } from "./task-editor-dialog";
 import { TaskPreviewDialog } from "./task-preview-dialog";
+import { TaskTimingInfo } from "./task-timing-info";
 import { TaskFilters } from "./task-filters";
-import type { Task, TaskStatus, UserRole } from "@/types";
+import { TaskFolderExplorer, type FolderSelection } from "./task-folder-explorer";
+import type { Task, TaskFolder, TaskStatus, UserRole } from "@/types";
 
 const statusLabel: Record<TaskStatus, string> = { pending: "Pendiente", in_progress: "En curso", completed: "Completada" };
 
@@ -31,6 +34,8 @@ export function TaskBoard({ role }: { role: UserRole }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [serverError, setServerError] = useState("");
+  const [folders, setFolders] = useState<TaskFolder[]>([]);
+  const [folderSelection, setFolderSelection] = useState<FolderSelection>("all");
 
   const loadTasks = useCallback(async () => {
     const query = new URLSearchParams({ page: String(page), size: "12", sort });
@@ -39,23 +44,43 @@ export function TaskBoard({ role }: { role: UserRole }) {
     if (search.trim()) query.set("q", search.trim());
     if (deadlineFrom) query.set("deadline_from", deadlineFrom);
     if (deadlineTo) query.set("deadline_to", deadlineTo);
+    if (folderSelection !== "all") query.set("folder_id", folderSelection);
     const response = await fetch(`/api/tasks?${query}`, { cache: "no-store" });
     const body = await response.json();
     if (!response.ok) throw new Error(body.error ?? "No se pudieron cargar las tareas");
     setTasks(body.data ?? []);
     setTotal(body.pagination?.total ?? 0);
     setPreview((current) => current ? (body.data ?? []).find((task: Task) => task.id === current.id) ?? null : null);
-  }, [deadlineFrom, deadlineTo, page, priority, search, sort, status]);
+  }, [deadlineFrom, deadlineTo, folderSelection, page, priority, search, sort, status]);
 
   useEffect(() => {
     // Initial synchronization with the API.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    Promise.all([loadTasks(), fetch("/api/auth/me", { cache: "no-store" }).then((response) => response.json())])
-      .then(([, me]) => {
+    Promise.all([loadTasks(), fetch("/api/auth/me", { cache: "no-store" }).then((response) => response.json()), fetch("/api/task-folders", { cache: "no-store" }).then(async (response) => ({ ok: response.ok, body: await response.json() }))])
+      .then(([, me, folderResponse]) => {
         setCurrentUserId(me.user?.id ?? "");
+        if (!folderResponse.ok) throw new Error(folderResponse.body.error ?? "No se pudieron cargar las carpetas");
+        setFolders(folderResponse.body.data ?? []);
       })
       .catch((error: unknown) => setServerError(error instanceof Error ? error.message : "No se pudieron cargar las tareas"));
   }, [loadTasks]);
+
+  const createFolder = async (name: string, parentId: string | null) => {
+    const response = await fetch("/api/task-folders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: parentId }) });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error ?? "No se pudo crear la carpeta");
+    setFolders((current) => [...current, body.data].sort((a, b) => a.name.localeCompare(b.name)));
+    setNotice(parentId ? "Subcarpeta creada." : "Carpeta creada.");
+  };
+
+  const moveTaskToFolder = async (taskId: string, folderId: string | null) => {
+    const response = await fetch(`/api/tasks/${taskId}/folder`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folder_id: folderId }) });
+    const body = await response.json();
+    if (!response.ok) { setServerError(body.error ?? "No se pudo mover la tarea"); return; }
+    setTasks((current) => folderSelection === "all" ? current.map((task) => task.id === taskId ? { ...task, folder_id: folderId } : task) : current.filter((task) => task.id !== taskId));
+    setNotice(folderId ? "Tarea movida a la carpeta." : "Tarea movida a Sin carpeta.");
+    void loadTasks().catch((error: unknown) => setServerError(error instanceof Error ? error.message : "No se pudieron actualizar las tareas"));
+  };
 
   const requestStatus = async (task: Task, requestedStatus: TaskStatus) => {
     const response = await fetch(`/api/tasks/${task.id}/status-request`, {
@@ -103,14 +128,16 @@ export function TaskBoard({ role }: { role: UserRole }) {
         onSearch={(value) => { setPage(1); setSearch(value); }} onStatus={(value) => { setPage(1); setStatus(value); }}
         onPriority={(value) => { setPage(1); setPriority(value); }} onDeadlineFrom={(value) => { setPage(1); setDeadlineFrom(value); }}
         onDeadlineTo={(value) => { setPage(1); setDeadlineTo(value); }} onSort={(value) => { setPage(1); setSort(value); }} onViewMode={setViewMode} />
-      {serverError && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800">{serverError}</p>}
-      {notice && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{notice}</p>}
+      <ToastMessages success={notice} error={serverError} onClearSuccess={() => setNotice("")} onClearError={() => setServerError("")} />
+      <div className="grid items-start gap-5 lg:grid-cols-[250px_minmax(0,1fr)]">
+      <TaskFolderExplorer folders={folders} selected={folderSelection} onSelect={(folder) => { setPage(1); setFolderSelection(folder); }} onCreate={createFolder} onMoveTask={moveTaskToFolder} />
+      <div className="min-w-0">
       {tasks.length === 0 ? <div className="card p-10 text-center text-slate-500">No hay tareas para este filtro.</div> : viewMode === "cards" ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {tasks.map((task) => {
             const overdue = Boolean(task.deadline) && task.status !== "completed" && isBefore(new Date(task.deadline!), new Date());
             const style = priorityStyles[task.priority];
-            return <article key={task.id} onClick={() => setPreview(task)} className={`cursor-pointer rounded-2xl border p-5 text-left shadow-sm ${style.card}`}>
+            return <article key={task.id} draggable={own(task)} onDragStart={(event) => { if (!own(task)) return; event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} onClick={() => setPreview(task)} className={`${own(task) ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} rounded-2xl border p-5 text-left shadow-sm ${style.card}`}>
               <div className="mb-4 flex items-start justify-between gap-3">
                 <span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${style.badge}`}>Prioridad {style.label}</span>
                 <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
@@ -124,13 +151,16 @@ export function TaskBoard({ role }: { role: UserRole }) {
               </div>
               <div className="block w-full text-left"><h2 className="font-display text-lg font-extrabold">{task.title}</h2>{task.description && <p className="mt-2 line-clamp-3 text-sm text-slate-700">{task.description}</p>}</div>
               <div className="mt-6 space-y-2 text-sm"><p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}><CalendarClock size={17} />{formatDeadline(task.deadline)}{overdue && " · Vencida"}</p>{task.reminders_enabled && <p className="flex items-center gap-2 font-semibold text-amber-800"><BellRing size={16} /> Recordatorios activos</p>}</div>
+              <TaskTimingInfo task={task} compact />
               <div className="mt-5 border-t border-black/10 pt-4"><span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-white">{statusLabel[task.status]}</span></div>
             </article>;
           })}
         </div>
       ) : (
-        <div className="card overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-4">Tarea</th><th className="px-5 py-4">Fecha límite</th><th className="px-5 py-4">Prioridad</th><th className="px-5 py-4">Estado</th><th className="px-5 py-4 text-right">Acciones</th></tr></thead><tbody className="divide-y divide-slate-200">{tasks.map((task) => { const style = priorityStyles[task.priority]; return <tr key={task.id} className="hover:bg-slate-50"><td onClick={() => setPreview(task)} className="cursor-pointer px-5 py-4 font-bold">{task.title}</td><td className="px-5 py-4">{formatDeadline(task.deadline)}</td><td className="px-5 py-4"><span className={`rounded-full px-2 py-1 text-xs font-bold ${style.badge}`}>{style.label}</span></td><td className="px-5 py-4">{statusLabel[task.status]}</td><td className="px-5 py-4"><div className="flex justify-end gap-1">{own(task) && <><button onClick={() => { setEditing(task); setEditorOpen(true); }} title="Configura avisos diarios, mensuales o por fecha límite." aria-label="Activar recordatorios" className="rounded-lg p-2"><BellRing size={17} /></button><button onClick={() => { setEditing(task); setEditorOpen(true); }} className="rounded-lg p-2"><Pencil size={17} /></button><button onClick={() => setDeleteTarget(task)} className="rounded-lg p-2 text-red-700"><Trash2 size={17} /></button></>}</div></td></tr>; })}</tbody></table></div>
+        <div className="card overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-4">Tarea</th><th className="px-5 py-4">Fecha límite</th><th className="px-5 py-4">Prioridad</th><th className="px-5 py-4">Estado</th><th className="px-5 py-4 text-right">Acciones</th></tr></thead><tbody className="divide-y divide-slate-200">{tasks.map((task) => { const style = priorityStyles[task.priority]; return <tr key={task.id} draggable={own(task)} onDragStart={(event) => { if (!own(task)) return; event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} className={`hover:bg-slate-50 ${own(task) ? "cursor-grab active:cursor-grabbing" : ""}`}><td onClick={() => setPreview(task)} className="cursor-pointer px-5 py-4 font-bold"><span>{task.title}</span><TaskTimingInfo task={task} compact /></td><td className="px-5 py-4">{formatDeadline(task.deadline)}</td><td className="px-5 py-4"><span className={`rounded-full px-2 py-1 text-xs font-bold ${style.badge}`}>{style.label}</span></td><td className="px-5 py-4">{statusLabel[task.status]}</td><td className="px-5 py-4"><div className="flex justify-end gap-1">{own(task) && <><button onClick={() => { setEditing(task); setEditorOpen(true); }} title="Configura avisos diarios, mensuales o por fecha límite." aria-label="Activar recordatorios" className="rounded-lg p-2"><BellRing size={17} /></button><button onClick={() => { setEditing(task); setEditorOpen(true); }} className="rounded-lg p-2"><Pencil size={17} /></button><button onClick={() => setDeleteTarget(task)} className="rounded-lg p-2 text-red-700"><Trash2 size={17} /></button></>}</div></td></tr>; })}</tbody></table></div>
       )}
+      </div>
+      </div>
       {total > 12 && <div className="mt-6 flex items-center justify-between"><p className="text-sm text-slate-500">Página {page} de {Math.ceil(total / 12)} · {total} tareas</p><div className="flex gap-2"><button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="rounded-lg border border-slate-300 p-2 disabled:opacity-40"><ChevronLeft size={19} /></button><button disabled={page >= Math.ceil(total / 12)} onClick={() => setPage((value) => value + 1)} className="rounded-lg border border-slate-300 p-2 disabled:opacity-40"><ChevronRight size={19} /></button></div></div>}
       <TaskEditorDialog open={editorOpen} onOpenChange={setEditorOpen} task={editing} responsibles={[]} actorRole="collaborator" currentUserId={currentUserId} onSaved={async (message) => { setNotice(message); await loadTasks(); }} />
       <TaskPreviewDialog task={preview} onOpenChange={(open) => !open && setPreview(null)} role={role} onRequestStatus={(task, requestedStatus) => own(task) ? void patchOwnTask(task, { status: requestedStatus }, "Estado actualizado.") : void requestStatus(task, requestedStatus)} />
