@@ -92,7 +92,10 @@ export function ManagerTaskBoard() {
         setTotal(tasksBody.pagination?.total ?? 0);
         setFolders(foldersBody.data ?? []);
         const requestedTask = new URLSearchParams(window.location.search).get("task");
-        if (requestedTask) setPreview((tasksBody.data ?? []).find((task: Task) => task.id === requestedTask) ?? null);
+        if (requestedTask) {
+          setPreview((tasksBody.data ?? []).find((task: Task) => task.id === requestedTask) ?? null);
+          window.history.replaceState(null, "", window.location.pathname);
+        }
         setResponsibles([
           { id: meBody.user.id, full_name: `${meBody.user.fullName} (yo)`, email: meBody.user.email, role: "manager" },
           ...(usersBody.data ?? []).filter((user: Responsible) => user.id !== meBody.user.id),
