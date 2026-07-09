@@ -103,43 +103,43 @@ export function CompaniesManager() {
     <section>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-bold text-indigo-600">ORGANIZACIONES</p>
-          <h1 className="font-display text-3xl font-extrabold">Empresas</h1>
-          <p className="mt-2 text-slate-600">Configura empresas y sus límites de usuarios.</p>
+          <p className="folio !text-[var(--primary)]">ORGANIZACIONES</p>
+          <h1 className="font-display text-3xl font-bold">Empresas</h1>
+          <p className="mt-2 text-[var(--ink-soft)]">Configura empresas y sus límites de usuarios.</p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white hover:bg-indigo-700">
+        <button onClick={openCreate} className="btn btn-primary !py-3">
           <Plus size={19} /> Nueva empresa
         </button>
       </div>
 
-      {serverError && <p role="alert" className="mt-6 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800">{serverError}</p>}
-      {notice && <p role="status" className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{notice}</p>}
+      {serverError && <p role="alert" className="mt-6 rounded-lg bg-[var(--stamp-red-wash)] p-4 text-sm font-semibold text-[var(--stamp-red)]">{serverError}</p>}
+      {notice && <p role="status" className="mt-6 rounded-lg bg-[#E9EFEA] p-4 text-sm font-semibold text-[#4A7058]">{notice}</p>}
 
       <div className="card mt-7 overflow-hidden">
         {loading ? (
-          <p className="p-8 text-center text-slate-500">Cargando empresas...</p>
+          <p className="p-8 text-center text-[var(--ink-soft)]">Cargando empresas...</p>
         ) : companies.length === 0 ? (
           <div className="p-10 text-center">
-            <Building2 className="mx-auto text-slate-300" size={38} />
-            <h2 className="mt-4 font-display text-lg font-extrabold">Todavía no hay empresas</h2>
-            <button onClick={openCreate} className="mt-4 font-bold text-indigo-700">Crear la primera empresa</button>
+            <Building2 className="mx-auto text-[var(--line-strong)]" size={38} />
+            <h2 className="mt-4 font-display text-lg font-bold">Todavía no hay empresas</h2>
+            <button onClick={openCreate} className="mt-4 font-bold text-[var(--primary)]">Crear la primera empresa</button>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[680px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <thead className="bg-[var(--paper)] text-xs uppercase tracking-wide text-[var(--ink-soft)]">
                 <tr><th className="px-5 py-4">Empresa</th><th className="px-5 py-4">Gestores/as</th><th className="px-5 py-4">Colaboradores/as</th><th className="px-5 py-4">Creada</th><th className="px-5 py-4 text-right">Acciones</th></tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-[var(--line)]">
                 {companies.map((company) => (
-                  <tr key={company.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-4"><p className="font-bold text-slate-900">{company.name}</p><p className="mt-1 max-w-sm truncate text-xs text-slate-500">{company.description || "Sin descripción"}</p></td>
+                  <tr key={company.id} className="hover:bg-[var(--paper)]">
+                    <td className="px-5 py-4"><p className="font-bold text-[var(--ink)]">{company.name}</p><p className="mt-1 max-w-sm truncate text-xs text-[var(--ink-soft)]">{company.description || "Sin descripción"}</p></td>
                     <td className="px-5 py-4 font-semibold">{company.max_managers}</td>
                     <td className="px-5 py-4 font-semibold">{company.max_collaborators}</td>
-                    <td className="px-5 py-4 text-slate-600">{new Date(company.created_at).toLocaleDateString("es-EC")}</td>
+                    <td className="folio px-5 py-4">{new Date(company.created_at).toLocaleDateString("es-EC")}</td>
                     <td className="px-5 py-4"><div className="flex justify-end gap-2">
-                      <button onClick={() => openEdit(company)} className="rounded-lg border border-slate-300 p-2 hover:bg-slate-100" aria-label={`Editar ${company.name}`}><Pencil size={17} /></button>
-                      <button onClick={() => setDeleteTarget(company)} className="rounded-lg border border-red-200 p-2 text-red-700 hover:bg-red-50" aria-label={`Eliminar ${company.name}`}><Trash2 size={17} /></button>
+                      <button onClick={() => openEdit(company)} className="rounded-md border border-[var(--line-strong)] p-2 hover:bg-[var(--paper-deep)]" aria-label={`Editar ${company.name}`}><Pencil size={17} /></button>
+                      <button onClick={() => setDeleteTarget(company)} className="rounded-md border border-[var(--stamp-red)] p-2 text-[var(--stamp-red)] hover:bg-[var(--stamp-red-wash)]" aria-label={`Eliminar ${company.name}`}><Trash2 size={17} /></button>
                     </div></td>
                   </tr>
                 ))}
@@ -151,16 +151,16 @@ export function CompaniesManager() {
 
       <AppDialog open={formOpen} onOpenChange={setFormOpen} title={editing ? "Editar empresa" : "Nueva empresa"} description="Define la empresa y los límites de su equipo." size="sm">
         <form onSubmit={handleSubmit(submit)} className="space-y-4" noValidate>
-          <Field label="Nombre" error={errors.name?.message}><input {...register("name")} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" /></Field>
-          <Field label="Descripción" error={errors.description?.message}><textarea {...register("description")} rows={3} className="w-full resize-y rounded-xl border border-slate-300 px-3 py-2.5" /></Field>
+          <Field label="Nombre" error={errors.name?.message}><input {...register("name")} className="input !py-2.5" /></Field>
+          <Field label="Descripción" error={errors.description?.message}><textarea {...register("description")} rows={3} className="input resize-y !py-2.5" /></Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Máx. gestores/as" error={errors.max_managers?.message}><input type="number" min={1} max={100} {...register("max_managers", { valueAsNumber: true })} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" /></Field>
-            <Field label="Máx. colaboradores/as" error={errors.max_collaborators?.message}><input type="number" min={1} max={10000} {...register("max_collaborators", { valueAsNumber: true })} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" /></Field>
+            <Field label="Máx. gestores/as" error={errors.max_managers?.message}><input type="number" min={1} max={100} {...register("max_managers", { valueAsNumber: true })} className="input !py-2.5" /></Field>
+            <Field label="Máx. colaboradores/as" error={errors.max_collaborators?.message}><input type="number" min={1} max={10000} {...register("max_collaborators", { valueAsNumber: true })} className="input !py-2.5" /></Field>
           </div>
-          {errors.root?.message && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{errors.root.message}</p>}
+          {errors.root?.message && <p role="alert" className="rounded-md bg-[var(--stamp-red-wash)] p-3 text-sm text-[var(--stamp-red)]">{errors.root.message}</p>}
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setFormOpen(false)} className="rounded-xl border border-slate-300 px-4 py-2.5 font-bold">Cancelar</button>
-            <button disabled={isSubmitting} className="rounded-xl bg-indigo-600 px-5 py-2.5 font-bold text-white disabled:opacity-60">{isSubmitting ? "Guardando..." : "Guardar"}</button>
+            <button type="button" onClick={() => setFormOpen(false)} className="btn btn-ghost">Cancelar</button>
+            <button disabled={isSubmitting} className="btn btn-primary !px-5">{isSubmitting ? "Guardando..." : "Guardar"}</button>
           </div>
         </form>
       </AppDialog>

@@ -58,30 +58,30 @@ export function AuditLogViewer() {
 
   return (
     <section>
-      <p className="text-sm font-bold text-indigo-600">SEGURIDAD</p>
-      <h1 className="font-display text-3xl font-extrabold">Auditoría</h1>
-      <p className="mt-2 text-slate-600">Consulta las acciones sensibles realizadas en el sistema.</p>
+      <p className="folio !text-[var(--primary)]">SEGURIDAD</p>
+      <h1 className="font-display text-3xl font-bold">Auditoría</h1>
+      <p className="mt-2 text-[var(--ink-soft)]">Consulta las acciones sensibles realizadas en el sistema.</p>
       <div className="mt-6 flex justify-end">
-        <select value={action} onChange={(event) => { setPage(1); setAction(event.target.value); }} className="rounded-xl border border-slate-300 bg-white px-3 py-2">
+        <select value={action} onChange={(event) => { setPage(1); setAction(event.target.value); }} className="input !w-auto !py-2">
           <option value="">Todas las acciones</option>
           {Object.entries(actionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
       </div>
-      {error && <p className="mt-4 rounded-xl bg-red-50 p-4 text-red-800">{error}</p>}
+      {error && <p className="mt-4 rounded-lg bg-[var(--stamp-red-wash)] p-4 text-[var(--stamp-red)]">{error}</p>}
       <div className="card mt-4 overflow-hidden">
         {logs.length === 0 ? (
-          <div className="p-10 text-center"><Activity className="mx-auto text-slate-300" size={38} /><p className="mt-3 font-bold">No hay registros para este filtro.</p></div>
+          <div className="p-10 text-center"><Activity className="mx-auto text-[var(--line-strong)]" size={38} /><p className="mt-3 font-bold">No hay registros para este filtro.</p></div>
         ) : (
-          <div className="divide-y divide-slate-200">
+          <div className="divide-y divide-[var(--line)]">
             {logs.map((log) => (
               <article key={log.id} className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
                 <div>
                   <p className="font-bold">{actionLabels[log.action] ?? log.action}</p>
-                  <p className="mt-1 text-sm text-slate-500">{log.actor?.full_name ?? "Sistema"} · {log.company?.name ?? "Global"}</p>
+                  <p className="mt-1 text-sm text-[var(--ink-soft)]">{log.actor?.full_name ?? "Sistema"} · {log.company?.name ?? "Global"}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <time className="text-sm text-slate-500">{new Date(log.created_at).toLocaleString("es-EC")}</time>
-                  <button onClick={() => setSelected(log)} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold hover:bg-slate-50">
+                  <time className="folio">{new Date(log.created_at).toLocaleString("es-EC")}</time>
+                  <button onClick={() => setSelected(log)} className="btn btn-ghost !px-3 !py-2 text-sm">
                     <Eye size={16} /> Ver detalle
                   </button>
                 </div>
@@ -92,10 +92,10 @@ export function AuditLogViewer() {
       </div>
       {total > 20 && (
         <div className="mt-5 flex items-center justify-between">
-          <p className="text-sm text-slate-500">Página {page} de {Math.ceil(total / 20)}</p>
+          <p className="folio">Página {page} de {Math.ceil(total / 20)}</p>
           <div className="flex gap-2">
-            <button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="rounded-lg border p-2 disabled:opacity-40"><ChevronLeft size={18} /></button>
-            <button disabled={page >= Math.ceil(total / 20)} onClick={() => setPage((value) => value + 1)} className="rounded-lg border p-2 disabled:opacity-40"><ChevronRight size={18} /></button>
+            <button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="btn btn-ghost !p-2" aria-label="Página anterior"><ChevronLeft size={18} /></button>
+            <button disabled={page >= Math.ceil(total / 20)} onClick={() => setPage((value) => value + 1)} className="btn btn-ghost !p-2" aria-label="Página siguiente"><ChevronRight size={18} /></button>
           </div>
         </div>
       )}
@@ -110,8 +110,8 @@ export function AuditLogViewer() {
             <Detail label="Tipo de entidad" value={selected.entity_type} />
             <Detail label="ID de entidad" value={selected.entity_id ?? "No disponible"} />
             <div className="sm:col-span-2">
-              <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Datos adicionales</dt>
-              <dd className="mt-2 overflow-x-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">
+              <dt className="folio uppercase">Datos adicionales</dt>
+              <dd className="mt-2 overflow-x-auto rounded-md bg-[#1F2823] p-4 font-mono text-xs text-[#e7eee9]">
                 <pre>{JSON.stringify(selected.metadata ?? {}, null, 2)}</pre>
               </dd>
             </div>
@@ -123,5 +123,5 @@ export function AuditLogViewer() {
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl bg-slate-50 p-4"><dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</dt><dd className="mt-1 break-words text-sm font-semibold text-slate-800">{value}</dd></div>;
+  return <div className="rounded-md bg-[var(--paper)] p-4"><dt className="folio uppercase">{label}</dt><dd className="mt-1 break-words text-sm font-semibold text-[var(--ink)]">{value}</dd></div>;
 }

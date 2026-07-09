@@ -126,36 +126,36 @@ export function PeopleManager({ mode }: { mode: "admin" | "manager" }) {
     <section>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-bold text-indigo-600">EQUIPO</p>
-          <h1 className="font-display text-3xl font-extrabold">{mode === "admin" ? "Personas" : "Colaboradores/as"}</h1>
-          <p className="mt-2 text-slate-600">{mode === "admin" ? "Crea gestores/as y colaboradores/as, y asígnalos/as a una empresa." : "Crea y administra colaboradores/as de tu empresa."}</p>
+          <p className="folio !text-[var(--primary)]">EQUIPO</p>
+          <h1 className="font-display text-3xl font-bold">{mode === "admin" ? "Personas" : "Colaboradores/as"}</h1>
+          <p className="mt-2 text-[var(--ink-soft)]">{mode === "admin" ? "Crea gestores/as y colaboradores/as, y asígnalos/as a una empresa." : "Crea y administra colaboradores/as de tu empresa."}</p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white hover:bg-indigo-700"><Plus size={19} /> Nueva cuenta</button>
+        <button onClick={openCreate} className="btn btn-primary !py-3"><Plus size={19} /> Nueva cuenta</button>
       </div>
 
-      {serverError && <p role="alert" className="mt-6 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800">{serverError}</p>}
-      {notice && <p role="status" className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{notice}</p>}
-      <div className="mt-6 flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-3">
-        <div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-2.5 text-slate-400" size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nombre o correo…" className="w-full rounded-lg border border-slate-300 py-2 pl-10 pr-3 text-sm" /></div>
-        {mode === "admin" && <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option value="">Todos los roles</option><option value="manager">Gestores/as</option><option value="collaborator">Colaboradores/as</option></select>}
+      {serverError && <p role="alert" className="mt-6 rounded-lg bg-[var(--stamp-red-wash)] p-4 text-sm font-semibold text-[var(--stamp-red)]">{serverError}</p>}
+      {notice && <p role="status" className="mt-6 rounded-lg bg-[#E9EFEA] p-4 text-sm font-semibold text-[#4A7058]">{notice}</p>}
+      <div className="card mt-6 flex flex-wrap gap-2 p-3">
+        <div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-2.5 text-[var(--line-strong)]" size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nombre o correo…" className="input !py-2 !pl-10 !pr-3 text-sm" /></div>
+        {mode === "admin" && <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="input !w-auto !py-2 text-sm"><option value="">Todos los roles</option><option value="manager">Gestores/as</option><option value="collaborator">Colaboradores/as</option></select>}
       </div>
       <div className="card mt-7 overflow-hidden">
-        {loading ? <p className="p-8 text-center text-slate-500">Cargando personas...</p> : visiblePeople.length === 0 ? (
-          <div className="p-10 text-center"><UserRound className="mx-auto text-slate-300" size={38} /><p className="mt-4 font-bold">No hay cuentas para mostrar.</p></div>
+        {loading ? <p className="p-8 text-center text-[var(--ink-soft)]">Cargando personas...</p> : visiblePeople.length === 0 ? (
+          <div className="p-10 text-center"><UserRound className="mx-auto text-[var(--line-strong)]" size={38} /><p className="mt-4 font-bold">No hay cuentas para mostrar.</p></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-4">Persona</th><th className="px-5 py-4">Empresa</th><th className="px-5 py-4">Rol</th><th className="px-5 py-4">Alta</th><th className="px-5 py-4 text-right">Acciones</th></tr></thead>
-              <tbody className="divide-y divide-slate-200">
+              <thead className="bg-[var(--paper)] text-xs uppercase text-[var(--ink-soft)]"><tr><th className="px-5 py-4">Persona</th><th className="px-5 py-4">Empresa</th><th className="px-5 py-4">Rol</th><th className="px-5 py-4">Alta</th><th className="px-5 py-4 text-right">Acciones</th></tr></thead>
+              <tbody className="divide-y divide-[var(--line)]">
                 {visiblePeople.map((person) => (
-                  <tr key={person.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-4"><p className="font-bold">{person.full_name}</p><p className="text-xs text-slate-500">{person.email}</p></td>
+                  <tr key={person.id} className="hover:bg-[var(--paper)]">
+                    <td className="px-5 py-4"><p className="font-bold">{person.full_name}</p><p className="text-xs text-[var(--ink-soft)]">{person.email}</p></td>
                     <td className="px-5 py-4">{companyName(person.company)}</td>
-                    <td className="px-5 py-4"><span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">{person.role === "manager" ? "Gestor/a" : "Colaborador/a"}</span></td>
-                    <td className="px-5 py-4 text-slate-600">{new Date(person.created_at).toLocaleDateString("es-EC")}</td>
+                    <td className="px-5 py-4"><span className={person.role === "manager" ? "stamp stamp-primary" : "stamp stamp-neutral"}>{person.role === "manager" ? "Gestor/a" : "Colaborador/a"}</span></td>
+                    <td className="folio px-5 py-4">{new Date(person.created_at).toLocaleDateString("es-EC")}</td>
                     <td className="px-5 py-4"><div className="flex justify-end gap-2">
-                      <button onClick={() => openEdit(person)} className="rounded-lg border border-slate-300 p-2 hover:bg-slate-100" aria-label={`Editar ${person.full_name}`}><Pencil size={17} /></button>
-                      <button onClick={() => setDeleteTarget(person)} className="rounded-lg border border-red-200 p-2 text-red-700 hover:bg-red-50" aria-label={`Eliminar ${person.full_name}`}><Trash2 size={17} /></button>
+                      <button onClick={() => openEdit(person)} className="rounded-md border border-[var(--line-strong)] p-2 hover:bg-[var(--paper-deep)]" aria-label={`Editar ${person.full_name}`}><Pencil size={17} /></button>
+                      <button onClick={() => setDeleteTarget(person)} className="rounded-md border border-[var(--stamp-red)] p-2 text-[var(--stamp-red)] hover:bg-[var(--stamp-red-wash)]" aria-label={`Eliminar ${person.full_name}`}><Trash2 size={17} /></button>
                     </div></td>
                   </tr>
                 ))}
@@ -167,17 +167,17 @@ export function PeopleManager({ mode }: { mode: "admin" | "manager" }) {
 
       <AppDialog open={formOpen} onOpenChange={setFormOpen} title={editing ? "Editar cuenta" : "Nueva cuenta"} description="Configura los datos de acceso y la asignación de la persona." size="sm">
         <form onSubmit={handleSubmit(submit)} className="space-y-4" noValidate>
-          <Field label="Nombre completo" error={errors.full_name?.message}><input {...register("full_name")} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" /></Field>
-          <Field label="Correo" error={errors.email?.message}><input type="email" {...register("email")} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" /></Field>
-          <Field label={editing ? "Nueva contraseña" : "Contraseña temporal"} error={errors.password?.message}><input type="password" {...register("password")} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" placeholder={editing ? "Déjala vacía para conservarla" : "Mínimo 8 caracteres"} /></Field>
+          <Field label="Nombre completo" error={errors.full_name?.message}><input {...register("full_name")} className="input !py-2.5" /></Field>
+          <Field label="Correo" error={errors.email?.message}><input type="email" {...register("email")} className="input !py-2.5" /></Field>
+          <Field label={editing ? "Nueva contraseña" : "Contraseña temporal"} error={errors.password?.message}><input type="password" {...register("password")} className="input !py-2.5" placeholder={editing ? "Déjala vacía para conservarla" : "Mínimo 8 caracteres"} /></Field>
           {!editing && mode === "admin" && <>
-            <Field label="Empresa" error={errors.company_id?.message}><select {...register("company_id")} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"><option value="">Selecciona una empresa</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select></Field>
-            <Field label="Rol" error={errors.role?.message}><select {...register("role")} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"><option value="manager">Gestor/a</option><option value="collaborator">Colaborador/a</option></select></Field>
+            <Field label="Empresa" error={errors.company_id?.message}><select {...register("company_id")} className="input !py-2.5"><option value="">Selecciona una empresa</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select></Field>
+            <Field label="Rol" error={errors.role?.message}><select {...register("role")} className="input !py-2.5"><option value="manager">Gestor/a</option><option value="collaborator">Colaborador/a</option></select></Field>
           </>}
-          {errors.root?.message && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{errors.root.message}</p>}
+          {errors.root?.message && <p role="alert" className="rounded-md bg-[var(--stamp-red-wash)] p-3 text-sm text-[var(--stamp-red)]">{errors.root.message}</p>}
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setFormOpen(false)} className="rounded-xl border border-slate-300 px-4 py-2.5 font-bold">Cancelar</button>
-            <button disabled={isSubmitting} className="rounded-xl bg-indigo-600 px-5 py-2.5 font-bold text-white disabled:opacity-60">{isSubmitting ? "Guardando..." : "Guardar"}</button>
+            <button type="button" onClick={() => setFormOpen(false)} className="btn btn-ghost">Cancelar</button>
+            <button disabled={isSubmitting} className="btn btn-primary !px-5">{isSubmitting ? "Guardando..." : "Guardar"}</button>
           </div>
         </form>
       </AppDialog>

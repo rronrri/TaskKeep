@@ -172,14 +172,14 @@ export function ProfileManager() {
 
   return (
     <section className="mx-auto max-w-3xl">
-      <p className="text-sm font-bold text-indigo-600">MI CUENTA</p>
-      <h1 className="font-display text-3xl font-extrabold">{forcedChange ? "Cambia tu contrasena temporal" : "Perfil"}</h1>
-      <p className="mt-2 text-slate-600">
+      <p className="folio !text-[var(--primary)]">MI CUENTA</p>
+      <h1 className="font-display text-3xl font-bold">{forcedChange ? "Cambia tu contrasena temporal" : "Perfil"}</h1>
+      <p className="mt-2 text-[var(--ink-soft)]">
         {forcedChange ? "Debes establecer una contrasena personal antes de usar el sistema." : "Administra tus datos, tu acceso y Google Drive desde modales separados."}
       </p>
 
       {forcedChange && (
-        <div className="mt-6 flex gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+        <div className="mt-6 flex gap-3 rounded-lg border border-[#9A7B24] bg-[#F3EDDC] p-4 text-[#6b5619]">
           <ShieldAlert className="mt-0.5 shrink-0" size={22} />
           <div>
             <p className="font-bold">Cambio obligatorio</p>
@@ -187,50 +187,50 @@ export function ProfileManager() {
           </div>
         </div>
       )}
-      {serverError && <p role="alert" className="mt-6 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800">{serverError}</p>}
-      {notice && <p role="status" className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{notice}</p>}
+      {serverError && <p role="alert" className="mt-6 rounded-lg bg-[var(--stamp-red-wash)] p-4 text-sm font-semibold text-[var(--stamp-red)]">{serverError}</p>}
+      {notice && <p role="status" className="mt-6 rounded-lg bg-[#E9EFEA] p-4 text-sm font-semibold text-[#4A7058]">{notice}</p>}
 
       <div className="card mt-7 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--line)] pb-5">
           <div className="flex items-center gap-4">
-            <span className="rounded-2xl bg-indigo-100 p-4 text-indigo-700"><UserRound size={28} /></span>
+            <span className="rounded-lg bg-[var(--primary-wash)] p-4 text-[var(--primary)]"><UserRound size={28} /></span>
             <div>
               <p className="font-bold">{meta?.full_name ?? "Usuario"}</p>
-              <p className="text-sm text-slate-500">{meta?.email ?? "..."}</p>
-              <p className="mt-1 text-xs font-semibold text-slate-500">{roleLabel(meta?.role)} - {profileCompany(meta?.company)} - Cuenta desde {meta ? new Date(meta.created_at).toLocaleDateString("es-EC") : "..."}</p>
+              <p className="text-sm text-[var(--ink-soft)]">{meta?.email ?? "..."}</p>
+              <p className="folio mt-1">{roleLabel(meta?.role)} · {profileCompany(meta?.company)} · Cuenta desde {meta ? new Date(meta.created_at).toLocaleDateString("es-EC") : "..."}</p>
             </div>
           </div>
-          <button type="button" onClick={() => setAccountModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700">
+          <button type="button" onClick={() => setAccountModalOpen(true)} className="btn btn-primary !px-4 !py-2.5 text-sm">
             <Pencil size={17} />
             Cambiar correo o contrasena
           </button>
         </div>
 
         {meta?.role === "manager" && (
-          <section className="mt-7 rounded-2xl border border-blue-200 bg-blue-50/60 p-5" aria-labelledby="google-drive-heading">
+          <section className="mt-7 rounded-lg border border-[var(--primary)] bg-[var(--primary-wash)] p-5" aria-labelledby="google-drive-heading">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="max-w-xl">
                 <div className="flex items-center gap-2">
-                  <FolderOpen className="text-blue-700" size={21} />
-                  <h2 id="google-drive-heading" className="font-display text-lg font-extrabold">Google Drive de la empresa</h2>
+                  <FolderOpen className="text-[var(--primary)]" size={21} />
+                  <h2 id="google-drive-heading" className="font-display text-lg font-bold">Google Drive de la empresa</h2>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-700">
+                <p className="mt-2 text-sm leading-6 text-[var(--ink)]">
                   Conecta tu cuenta y configura una carpeta raiz. Los colaboradores/as usaran esta misma carpeta automaticamente para subir archivos de tareas.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <a href="/api/google/connect?return=/manager/profile" className="inline-flex items-center gap-2 rounded-xl border border-blue-300 bg-white px-4 py-2.5 text-sm font-bold text-blue-800 hover:bg-blue-100">
+                <a href="/api/google/connect?return=/manager/profile" className="btn btn-ghost !px-4 !py-2.5 text-sm !text-[var(--primary)]">
                   <ExternalLink size={17} />
                   {meta.google_email ? "Reconectar Google" : "Conectar Google"}
                 </a>
-                <button type="button" onClick={() => setDriveModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800">
+                <button type="button" onClick={() => setDriveModalOpen(true)} className="btn btn-primary !px-4 !py-2.5 text-sm">
                   <FolderOpen size={17} />
                   Configurar carpeta
                 </button>
               </div>
             </div>
-            <p className="mt-4 text-sm font-semibold text-slate-700">Estado: {meta.google_email ? `Conectado como ${meta.google_email}` : "Google no conectado"}</p>
-            <p className="mt-2 text-sm text-slate-600">Carpeta: {company?.drive_folder_url ? "Configurada y validada" : "Aun no configurada"}</p>
+            <p className="mt-4 text-sm font-semibold text-[var(--ink)]">Estado: {meta.google_email ? `Conectado como ${meta.google_email}` : "Google no conectado"}</p>
+            <p className="mt-2 text-sm text-[var(--ink-soft)]">Carpeta: {company?.drive_folder_url ? "Configurada y validada" : "Aun no configurada"}</p>
           </section>
         )}
       </div>
@@ -239,26 +239,26 @@ export function ProfileManager() {
         <form onSubmit={handleSubmit(submitAccount)} className="space-y-4" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Nombre completo" error={errors.full_name?.message}>
-              <input {...register("full_name")} readOnly={forcedChange} autoComplete="name" className="w-full rounded-xl border border-slate-300 px-3 py-2.5 read-only:bg-slate-100" />
+              <input {...register("full_name")} readOnly={forcedChange} autoComplete="name" className="input !py-2.5 read-only:bg-[var(--paper-deep)]" />
             </Field>
             <Field label="Correo electronico" error={errors.email?.message}>
-              <input type="email" {...register("email")} readOnly={forcedChange} autoComplete="email" className="w-full rounded-xl border border-slate-300 px-3 py-2.5 read-only:bg-slate-100" />
+              <input type="email" {...register("email")} readOnly={forcedChange} autoComplete="email" className="input !py-2.5 read-only:bg-[var(--paper-deep)]" />
             </Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Contrasena actual" error={errors.current_password?.message}>
-              <input type="password" {...register("current_password")} autoComplete="current-password" className="w-full rounded-xl border border-slate-300 px-3 py-2.5" />
+              <input type="password" {...register("current_password")} autoComplete="current-password" className="input !py-2.5" />
             </Field>
             <Field label="Nueva contrasena" error={errors.new_password?.message}>
-              <input type="password" {...register("new_password")} autoComplete="new-password" className="w-full rounded-xl border border-slate-300 px-3 py-2.5" />
+              <input type="password" {...register("new_password")} autoComplete="new-password" className="input !py-2.5" />
             </Field>
             <Field label="Confirmar contrasena">
-              <input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="new-password" className="w-full rounded-xl border border-slate-300 px-3 py-2.5" />
+              <input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="new-password" className="input !py-2.5" />
             </Field>
           </div>
           <div className="flex justify-end gap-3">
-            {!forcedChange && <button type="button" onClick={() => setAccountModalOpen(false)} className="rounded-xl border border-slate-300 px-4 py-2 font-bold hover:bg-slate-50">Cancelar</button>}
-            <button disabled={isSubmitting} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 font-bold text-white hover:bg-indigo-700 disabled:opacity-60">
+            {!forcedChange && <button type="button" onClick={() => setAccountModalOpen(false)} className="btn btn-ghost !py-2">Cancelar</button>}
+            <button disabled={isSubmitting} className="btn btn-primary !px-5 !py-2">
               <Save size={18} />
               {isSubmitting ? "Guardando..." : forcedChange ? "Cambiar contrasena y continuar" : "Guardar cambios"}
             </button>
@@ -268,33 +268,33 @@ export function ProfileManager() {
 
       <AppDialog open={driveModalOpen} onOpenChange={setDriveModalOpen} title="Carpeta de Google Drive" description="Elige con Google Picker la carpeta raiz donde TaskKeep organizara los archivos aprobados." size="md">
         <div className="space-y-4">
-          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-slate-700">
+          <div className="rounded-lg border border-[var(--primary)] bg-[var(--primary-wash)] p-4 text-sm leading-6 text-[var(--ink)]">
             Primero conecta Google. Luego selecciona una carpeta accesible para esa cuenta. Los colaboradores/as usaran esta carpeta automaticamente al subir archivos.
           </div>
-          {driveError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-800">{driveError}</p>}
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Carpeta seleccionada</p>
-            <p className="mt-1 text-sm font-semibold text-slate-800">{driveFolderName || (driveLink ? "Carpeta actual configurada" : "Todavia no has elegido una carpeta")}</p>
+          {driveError && <p role="alert" className="rounded-md bg-[var(--stamp-red-wash)] p-3 text-sm font-semibold text-[var(--stamp-red)]">{driveError}</p>}
+          <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-4">
+            <p className="folio uppercase">Carpeta seleccionada</p>
+            <p className="mt-1 text-sm font-semibold text-[var(--ink)]">{driveFolderName || (driveLink ? "Carpeta actual configurada" : "Todavia no has elegido una carpeta")}</p>
           </div>
-          <button type="button" disabled={openingPicker} onClick={() => void openGooglePicker()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-300 bg-white px-4 py-2.5 text-sm font-bold text-blue-800 hover:bg-blue-50 disabled:opacity-60">
+          <button type="button" disabled={openingPicker} onClick={() => void openGooglePicker()} className="btn btn-ghost !px-4 !py-2.5 text-sm !text-[var(--primary)]">
             <FolderOpen size={17} />
             {openingPicker ? "Abriendo Google..." : "Elegir carpeta con Google"}
           </button>
           <div className="flex justify-end gap-3">
-            <button type="button" onClick={() => setDriveModalOpen(false)} className="rounded-xl border border-slate-300 px-4 py-2 font-bold hover:bg-slate-50">Cancelar</button>
-            <button type="button" disabled={savingDrive || !driveLink} onClick={() => void saveDriveFolder()} className="rounded-xl bg-blue-700 px-5 py-2 font-bold text-white hover:bg-blue-800 disabled:opacity-60">{savingDrive ? "Guardando..." : "Guardar carpeta"}</button>
+            <button type="button" onClick={() => setDriveModalOpen(false)} className="btn btn-ghost !py-2">Cancelar</button>
+            <button type="button" disabled={savingDrive || !driveLink} onClick={() => void saveDriveFolder()} className="btn btn-primary !px-5 !py-2">{savingDrive ? "Guardando..." : "Guardar carpeta"}</button>
           </div>
         </div>
       </AppDialog>
 
       <AppDialog open={driveSuccessOpen} onOpenChange={setDriveSuccessOpen} title="Google Drive guardado" description="La carpeta raiz fue validada y quedo conectada para la empresa." size="sm">
         <div className="space-y-4">
-          <div className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+          <div className="flex gap-3 rounded-lg border border-[#4A7058] bg-[#E9EFEA] p-4 text-[#3a5946]">
             <CheckCircle2 className="mt-0.5 shrink-0" size={22} />
             <p className="text-sm font-semibold">Listo. Los archivos aprobados se organizaran dentro de la carpeta configurada.</p>
           </div>
           <div className="flex justify-end">
-            <button type="button" onClick={() => setDriveSuccessOpen(false)} className="rounded-xl bg-emerald-600 px-5 py-2 font-bold text-white hover:bg-emerald-700">Entendido</button>
+            <button type="button" onClick={() => setDriveSuccessOpen(false)} className="btn !bg-[#4A7058] !px-5 !py-2 text-white hover:!bg-[#3a5946]">Entendido</button>
           </div>
         </div>
       </AppDialog>
