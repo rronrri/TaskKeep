@@ -1,4 +1,4 @@
-﻿import type { TaskPriority } from "@/types";
+import type { TaskPriority } from "@/types";
 
 export const priorityStyles: Record<
   TaskPriority,
@@ -6,27 +6,26 @@ export const priorityStyles: Record<
 > = {
   low: {
     label: "Baja",
-    card: "border-emerald-200 bg-emerald-50",
-    badge: "bg-emerald-100 text-emerald-800",
-    calendar: "#059669",
+    card: "card-priority-low",
+    badge: "stamp stamp-low",
+    calendar: "#4a7058",
   },
   medium: {
     label: "Media",
-    card: "border-sky-200 bg-sky-50",
-    badge: "bg-sky-100 text-sky-800",
-    calendar: "#0284c7",
+    card: "card-priority-medium",
+    badge: "stamp stamp-medium",
+    calendar: "#9a7b24",
   },
   high: {
     label: "Alta",
-    card: "border-orange-300 bg-orange-50",
-    badge: "bg-orange-100 text-orange-900",
-    calendar: "#ea580c",
+    card: "card-priority-high",
+    badge: "stamp stamp-high",
+    calendar: "#b4551d",
   },
   critical: {
     label: "Crítica",
-    card: "border-red-300 bg-red-50",
-    badge: "bg-red-600 text-white",
-    calendar: "#dc2626",
+    card: "card-priority-critical",
+    badge: "stamp stamp-critical",
+    calendar: "#a5311f",
   },
 };
-
