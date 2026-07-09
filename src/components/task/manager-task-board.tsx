@@ -17,10 +17,10 @@ import type { Task, TaskFolder, TaskStatus } from "@/types";
 
 interface Responsible extends ResponsibleOption { email: string; }
 
-const statusCardStyles: Record<TaskStatus, string> = {
-  pending: "border-amber-200 bg-amber-50/80",
-  in_progress: "border-indigo-200 bg-indigo-50/80",
-  completed: "border-emerald-200 bg-emerald-50/80",
+const statusStamp: Record<TaskStatus, string> = {
+  pending: "stamp stamp-neutral",
+  in_progress: "stamp stamp-primary",
+  completed: "stamp stamp-success",
 };
 
 export function ManagerTaskBoard() {
@@ -213,17 +213,17 @@ export function ManagerTaskBoard() {
 
   const actions = (task: Task) => (
     <div className="flex shrink-0 items-center gap-0.5" onClick={(event) => event.stopPropagation()}>
-      <button onClick={() => void patchTask(task, { is_pinned: !task.is_pinned }, task.is_pinned ? "Tarea desfijada." : "Tarea fijada.")} className="rounded-lg p-1.5 hover:bg-white/70" aria-label={task.is_pinned ? "Desfijar tarea" : "Fijar tarea"}>{task.is_pinned ? <PinOff size={17} /> : <Pin size={17} />}</button>
-      <button onClick={() => openReminders(task)} title="Configura avisos diarios, mensuales o por fecha límite. El predeterminado se adapta a la fecha." aria-label="Activar recordatorios" className={`rounded-lg p-1.5 hover:bg-white/70 ${task.reminders_enabled ? "text-amber-800" : ""}`}><BellRing size={17} /></button>
-      <button onClick={() => openEdit(task)} className="rounded-lg p-1.5 hover:bg-white/70" aria-label={`Editar ${task.title}`}><Pencil size={17} /></button>
-      <button onClick={() => setDeleteTarget(task)} className="rounded-lg p-1.5 text-red-700 hover:bg-red-50/70" aria-label={`Eliminar ${task.title}`}><Trash2 size={17} /></button>
+      <button onClick={() => void patchTask(task, { is_pinned: !task.is_pinned }, task.is_pinned ? "Tarea desfijada." : "Tarea fijada.")} className="rounded-md p-1.5 hover:bg-[var(--paper-deep)]" aria-label={task.is_pinned ? "Desfijar tarea" : "Fijar tarea"}>{task.is_pinned ? <PinOff size={17} /> : <Pin size={17} />}</button>
+      <button onClick={() => openReminders(task)} title="Configura avisos diarios, mensuales o por fecha límite. El predeterminado se adapta a la fecha." aria-label="Activar recordatorios" className={`rounded-md p-1.5 hover:bg-[var(--paper-deep)] ${task.reminders_enabled ? "text-[#9A7B24]" : ""}`}><BellRing size={17} /></button>
+      <button onClick={() => openEdit(task)} className="rounded-md p-1.5 hover:bg-[var(--paper-deep)]" aria-label={`Editar ${task.title}`}><Pencil size={17} /></button>
+      <button onClick={() => setDeleteTarget(task)} className="rounded-md p-1.5 text-[var(--stamp-red)] hover:bg-[var(--stamp-red-wash)]" aria-label={`Eliminar ${task.title}`}><Trash2 size={17} /></button>
     </div>
   );
 
   return (
     <section>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><h1 className="font-display text-3xl font-extrabold">Tareas</h1></div>
+        <div><h1 className="font-display text-3xl font-bold">Tareas</h1></div>
       </div>
 
       <TaskFilters
@@ -253,34 +253,33 @@ export function ManagerTaskBoard() {
       <ToastMessages success={notice} error={serverError} successAction={noticeAction} onClearSuccess={() => { setNotice(""); setNoticeAction(null); }} onClearError={() => setServerError("")} />
       <div className="mt-6">
         <TaskFolderExplorer folders={folders} selected={folderSelection} taskCount={tasks.length} searchQuery={search} onSelect={(folder) => { setPage(1); setFolderSelection(folder); }} onCreate={createFolder} onDelete={deleteFolder} onMoveTask={moveTaskToFolder} onNewTask={openCreate}>
-        {loading ? <div className="col-span-full rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center text-slate-500">Cargando tareas...</div> : tasks.length === 0 ? <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-slate-500">No hay tareas para estos filtros.</div> : viewMode === "cards" ? (
+        {loading ? <div className="col-span-full rounded-lg border border-[var(--line)] bg-[var(--paper-deep)] p-10 text-center text-[var(--ink-soft)]">Cargando tareas...</div> : tasks.length === 0 ? <div className="col-span-full rounded-lg border border-dashed border-[var(--line-strong)] bg-[var(--paper-deep)] p-10 text-center text-[var(--ink-soft)]">No hay tareas para estos filtros.</div> : viewMode === "cards" ? (
           <>
             {tasks.map((task) => {
               const overdue = Boolean(task.deadline) && task.status !== "completed" && isBefore(new Date(task.deadline!), new Date());
               const priority = priorityStyles[task.priority];
-              const cardStyle = statusCardStyles[task.status];
               return (
-                <article key={task.id} draggable onContextMenu={(event) => openTaskMenu(event, task)} onDragStart={(event) => { event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} onClick={() => setPreview(task)} className={`cursor-grab rounded-2xl border p-3.5 shadow-sm active:cursor-grabbing ${cardStyle}`}>
-                  <div className="flex items-start justify-between gap-2"><span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-extrabold ${priority.badge}`}>{priority.label}</span>{actions(task)}</div>
-                  <div className="mt-2.5 block w-full text-left"><h2 className="font-display text-base font-extrabold hover:text-indigo-700">{task.title}</h2>{task.description && <p className="mt-1.5 line-clamp-2 text-xs text-slate-700">{task.description}</p>}</div>
-                  <div className="mt-3 space-y-1.5 text-xs"><p className={`flex items-center gap-2 font-semibold ${overdue ? "text-red-700" : ""}`}><CalendarClock size={17} />{formatDeadline(task.deadline)}{overdue && " · Vencida"}</p><p>Responsable: <strong>{task.responsible?.full_name ?? "Sin nombre"}</strong></p></div>
+                <article key={task.id} draggable onContextMenu={(event) => openTaskMenu(event, task)} onDragStart={(event) => { event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} onClick={() => setPreview(task)} className={`card ${priority.card} cursor-grab p-3.5 active:cursor-grabbing`}>
+                  <div className="flex items-start justify-between gap-2"><span className={`shrink-0 ${priority.badge}`}>{priority.label}</span>{actions(task)}</div>
+                  <div className="mt-2.5 block w-full text-left"><h2 className="font-display text-base font-bold hover:text-[var(--primary)]">{task.title}</h2>{task.description && <p className="mt-1.5 line-clamp-2 text-xs text-[var(--ink-soft)]">{task.description}</p>}</div>
+                  <div className="mt-3 space-y-1.5"><p className={`folio flex items-center gap-2 ${overdue ? "!text-[var(--stamp-red)]" : ""}`}><CalendarClock size={15} />{formatDeadline(task.deadline)}{overdue && " · VENCIDA"}</p><p className="folio">Responsable · {task.responsible?.full_name ?? "Sin nombre"}</p></div>
                   <TaskTimingInfo task={task} compact />
-                  <label onClick={(event) => event.stopPropagation()} className="mt-3 block border-t border-black/10 pt-3 text-xs font-bold uppercase tracking-wide">Estado<select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="mt-2 w-full rounded-lg border border-black/15 bg-white/75 px-3 py-2 text-sm normal-case"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></label>
+                  <label onClick={(event) => event.stopPropagation()} className="mt-3 block border-t border-[var(--line)] pt-3 text-xs font-bold uppercase tracking-wide">Estado<select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="input mt-2 !py-2 text-sm normal-case"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></label>
                 </article>
               );
             })}
           </>
         ) : (
-          <div className="col-span-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="card col-span-full overflow-x-auto">
             <table className="w-full min-w-[780px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-4">Tarea</th><th className="px-5 py-4">Responsable</th><th className="px-5 py-4">Fecha límite</th><th className="px-5 py-4">Estado</th><th className="px-5 py-4 text-right">Acciones</th></tr></thead>
-              <tbody className="divide-y divide-slate-200">
+              <thead className="bg-[var(--paper)] text-xs uppercase text-[var(--ink-soft)]"><tr><th className="px-5 py-4">Tarea</th><th className="px-5 py-4">Responsable</th><th className="px-5 py-4">Fecha límite</th><th className="px-5 py-4">Estado</th><th className="px-5 py-4 text-right">Acciones</th></tr></thead>
+              <tbody className="divide-y divide-[var(--line)]">
                 {tasks.map((task) => { const priority = priorityStyles[task.priority]; return (
-                  <tr key={task.id} draggable onContextMenu={(event) => openTaskMenu(event, task)} onDragStart={(event) => { event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} onClick={() => setPreview(task)} className="cursor-grab hover:bg-slate-50 active:cursor-grabbing">
-                    <td className="px-5 py-4"><div className="text-left"><p className="font-bold hover:text-indigo-700">{task.title}</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${priority.badge}`}>{priority.label}</span><TaskTimingInfo task={task} compact /></div></td>
+                  <tr key={task.id} draggable onContextMenu={(event) => openTaskMenu(event, task)} onDragStart={(event) => { event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} onClick={() => setPreview(task)} className="cursor-grab hover:bg-[var(--paper)] active:cursor-grabbing">
+                    <td className="px-5 py-4"><div className="text-left"><p className="font-bold hover:text-[var(--primary)]">{task.title}</p><span className={`mt-1 inline-block ${priority.badge}`}>{priority.label}</span><TaskTimingInfo task={task} compact /></div></td>
                     <td className="px-5 py-4">{task.responsible?.full_name ?? "Sin nombre"}</td>
-                    <td className="px-5 py-4">{formatDeadline(task.deadline)}</td>
-                    <td className="px-5 py-4" onClick={(event) => event.stopPropagation()}><select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></td>
+                    <td className="folio px-5 py-4">{formatDeadline(task.deadline)}</td>
+                    <td className="px-5 py-4" onClick={(event) => event.stopPropagation()}><select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="input !w-auto !px-2 !py-1.5"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></td>
                     <td className="px-5 py-4"><div className="flex justify-end">{actions(task)}</div></td>
                   </tr>
                 ); })}
@@ -290,7 +289,7 @@ export function ManagerTaskBoard() {
         )}
         </TaskFolderExplorer>
       </div>
-      {total > 12 && <div className="mt-6 flex items-center justify-between"><p className="text-sm text-slate-500">Página {page} de {Math.ceil(total / 12)} · {total} tareas</p><div className="flex gap-2"><button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="rounded-lg border border-slate-300 p-2 disabled:opacity-40" aria-label="Página anterior"><ChevronLeft size={19} /></button><button disabled={page >= Math.ceil(total / 12)} onClick={() => setPage((value) => value + 1)} className="rounded-lg border border-slate-300 p-2 disabled:opacity-40" aria-label="Página siguiente"><ChevronRight size={19} /></button></div></div>}
+      {total > 12 && <div className="mt-6 flex items-center justify-between"><p className="folio">Página {page} de {Math.ceil(total / 12)} · {total} tareas</p><div className="flex gap-2"><button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="btn btn-ghost !p-2" aria-label="Página anterior"><ChevronLeft size={19} /></button><button disabled={page >= Math.ceil(total / 12)} onClick={() => setPage((value) => value + 1)} className="btn btn-ghost !p-2" aria-label="Página siguiente"><ChevronRight size={19} /></button></div></div>}
 
       <TaskEditorDialog open={editorOpen} onOpenChange={setEditorOpen} task={editing} responsibles={responsibles} initialFolderId={currentFolderId} mode={editorMode} onSaved={async (message) => { setNotice(message); await loadTasks(); }} />
       {contextMenu && <TaskContextMenu task={contextMenu.task} folders={folders} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onMove={moveContextTask} />}

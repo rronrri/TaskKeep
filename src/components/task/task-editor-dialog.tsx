@@ -197,11 +197,11 @@ export function TaskEditorDialog({
         <>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Titulo" error={errors.title?.message}>
-            <input {...register("title")} className="w-full rounded-xl border border-slate-300 px-3 py-2" />
+            <input {...register("title")} className="input !py-2" />
           </Field>
           {actorRole === "manager" ? (
             <Field label="Responsable" error={errors.responsible_id?.message}>
-              <select {...register("responsible_id")} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2">
+              <select {...register("responsible_id")} className="input !py-2">
                 <option value="">Selecciona una persona</option>
                 {responsibles.map((person) => <option key={person.id} value={person.id}>{person.full_name} - {person.role === "manager" ? "Gestor/a" : "Colaborador/a"}</option>)}
               </select>
@@ -210,24 +210,24 @@ export function TaskEditorDialog({
         </div>
 
         <Field label="Descripcion" error={errors.description?.message}>
-          <textarea {...register("description")} rows={2} className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2" />
+          <textarea {...register("description")} rows={2} className="input resize-none !py-2" />
         </Field>
 
         <div className="grid gap-3 md:grid-cols-3">
           <Field label="Prioridad" error={errors.priority?.message}>
-            <select {...register("priority")} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2">
+            <select {...register("priority")} className="input !py-2">
               <option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option><option value="critical">Critica</option>
             </select>
           </Field>
           <Field label="Estado" error={errors.status?.message}>
-            <select {...register("status")} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2">
+            <select {...register("status")} className="input !py-2">
               <option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option>
             </select>
           </Field>
           <Field label="Recordatorio" error={errors.reminder_mode?.message}>
             <div className="relative">
-              <BellRing className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-amber-700" size={17} />
-              <select {...register("reminder_mode")} className="w-full rounded-xl border border-amber-300 bg-amber-50 py-2 pl-10 pr-3 font-semibold text-amber-950">
+              <BellRing className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-[#9A7B24]" size={17} />
+              <select {...register("reminder_mode")} className="input !border-[#9A7B24] !bg-[#F3EDDC] !py-2 !pl-10 !pr-3 font-semibold !text-[#6b5619]">
                 <option value="none">Sin recordatorios</option>
                 <option value="daily">Una vez al dia</option>
                 <option value="monthly">Una vez al mes</option>
@@ -242,8 +242,8 @@ export function TaskEditorDialog({
         {remindersOnly && (
           <Field label="Recordatorio" error={errors.reminder_mode?.message}>
             <div className="relative">
-              <BellRing className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-amber-700" size={17} />
-              <select {...register("reminder_mode")} className="w-full rounded-xl border border-amber-300 bg-amber-50 py-2 pl-10 pr-3 font-semibold text-amber-950">
+              <BellRing className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-[#9A7B24]" size={17} />
+              <select {...register("reminder_mode")} className="input !border-[#9A7B24] !bg-[#F3EDDC] !py-2 !pl-10 !pr-3 font-semibold !text-[#6b5619]">
                 <option value="none">Sin recordatorios</option>
                 <option value="daily">Una vez al dia</option>
                 <option value="monthly">Una vez al mes</option>
@@ -254,40 +254,40 @@ export function TaskEditorDialog({
         )}
 
         {(reminderMode === "daily" || reminderMode === "monthly") && (
-          <div className="grid gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 md:grid-cols-2">
+          <div className="grid gap-3 rounded-lg border border-[#d9c98f] bg-[#F3EDDC]/70 p-3 md:grid-cols-2">
             <Field label="Hora del recordatorio" error={errors.recurring_time?.message}>
-              <input type="time" {...register("recurring_time")} className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2" />
+              <input type="time" {...register("recurring_time")} className="input !py-2" />
             </Field>
             {reminderMode === "monthly" && (
               <Field label="Dia del mes" error={errors.monthly_day?.message}>
-                <input type="number" min={1} max={31} {...register("monthly_day")} className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2" />
+                <input type="number" min={1} max={31} {...register("monthly_day")} className="input !py-2" />
               </Field>
             )}
           </div>
         )}
 
         {reminderMode === "deadline" && (
-          <div className="grid gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
+          <div className="grid gap-3 rounded-lg border border-[#d9c98f] bg-[#F3EDDC]/70 p-3">
             <Field label="Fecha limite" error={errors.deadline?.message}>
-              <input type="datetime-local" {...register("deadline")} className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2" />
+              <input type="datetime-local" {...register("deadline")} className="input !py-2" />
             </Field>
             {!customDeadline ? (
-              <div className="rounded-2xl border border-amber-200 bg-white p-4">
-                <p className="text-sm font-bold text-amber-950">{defaultReminderText(minutesLeft)}</p>
-                <p className="mt-1 text-xs text-slate-600">Este es el comportamiento recomendado para no saturar a la persona responsable.</p>
-                {errors.deadline_offsets?.message && <p className="mt-2 text-xs font-semibold text-red-700">{errors.deadline_offsets.message}</p>}
-                <button type="button" onClick={enableCustomDeadline} className="mt-3 rounded-xl border border-amber-300 px-4 py-2 text-sm font-bold text-amber-900 hover:bg-amber-50">
+              <div className="rounded-lg border border-[#d9c98f] bg-[var(--surface)] p-4">
+                <p className="text-sm font-bold text-[#6b5619]">{defaultReminderText(minutesLeft)}</p>
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">Este es el comportamiento recomendado para no saturar a la persona responsable.</p>
+                {errors.deadline_offsets?.message && <p className="mt-2 text-xs font-semibold text-[var(--stamp-red)]">{errors.deadline_offsets.message}</p>}
+                <button type="button" onClick={enableCustomDeadline} className="btn btn-ghost mt-3 !px-4 !py-2 text-sm !text-[#6b5619]">
                   Personalizar
                 </button>
               </div>
             ) : (
-              <div className="rounded-2xl border border-amber-200 bg-white p-4">
+              <div className="rounded-lg border border-[#d9c98f] bg-[var(--surface)] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-bold text-amber-950">Recordatorios personalizados</p>
-                    <p className="text-xs text-slate-600">Agrega uno o varios momentos. No se puede repetir el mismo aviso.</p>
+                    <p className="text-sm font-bold text-[#6b5619]">Recordatorios personalizados</p>
+                    <p className="text-xs text-[var(--ink-soft)]">Agrega uno o varios momentos. No se puede repetir el mismo aviso.</p>
                   </div>
-                  <button type="button" disabled={!hasAvailableReminderOption} onClick={() => append({ value: firstAvailableOption(usedOptions, minutesLeft) })} className="inline-flex items-center gap-2 rounded-xl bg-amber-700 px-3 py-2 text-sm font-bold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50">
+                  <button type="button" disabled={!hasAvailableReminderOption} onClick={() => append({ value: firstAvailableOption(usedOptions, minutesLeft) })} className="btn !bg-[#9A7B24] !px-3 !py-2 text-sm text-white hover:!bg-[#7d6420]">
                     <Plus size={16} /> Agregar
                   </button>
                 </div>
@@ -297,7 +297,7 @@ export function TaskEditorDialog({
                     const currentOffsets = splitOption(currentValue);
                     return (
                       <div key={field.id} className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                        <select {...register(`deadline_offsets.${index}.value`)} className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2">
+                        <select {...register(`deadline_offsets.${index}.value`)} className="input !py-2">
                           {reminderOptionGroups.map((group) => (
                             <optgroup key={group.label} label={group.label}>
                               {group.options.map((option) => {
@@ -309,15 +309,15 @@ export function TaskEditorDialog({
                             </optgroup>
                           ))}
                         </select>
-                        <button type="button" onClick={() => remove(index)} disabled={fields.length === 1} className="rounded-xl border border-red-200 p-2 text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Quitar recordatorio">
+                        <button type="button" onClick={() => remove(index)} disabled={fields.length === 1} className="rounded-md border border-[var(--stamp-red)] p-2 text-[var(--stamp-red)] hover:bg-[var(--stamp-red-wash)] disabled:cursor-not-allowed disabled:opacity-40" aria-label="Quitar recordatorio">
                           <Trash2 size={18} />
                         </button>
                       </div>
                     );
                   })}
                 </div>
-                {errors.deadline_offsets?.message && <p className="mt-2 text-xs font-semibold text-red-700">{errors.deadline_offsets.message}</p>}
-                <button type="button" onClick={() => setValue("custom_deadline", false, { shouldDirty: true })} className="mt-3 text-xs font-bold text-amber-900 hover:underline">
+                {errors.deadline_offsets?.message && <p className="mt-2 text-xs font-semibold text-[var(--stamp-red)]">{errors.deadline_offsets.message}</p>}
+                <button type="button" onClick={() => setValue("custom_deadline", false, { shouldDirty: true })} className="mt-3 text-xs font-bold text-[#6b5619] hover:underline">
                   Usar predeterminado
                 </button>
               </div>
@@ -325,10 +325,10 @@ export function TaskEditorDialog({
           </div>
         )}
 
-        {errors.root?.message && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{errors.root.message}</p>}
+        {errors.root?.message && <p role="alert" className="rounded-md bg-[var(--stamp-red-wash)] p-3 text-sm text-[var(--stamp-red)]">{errors.root.message}</p>}
         <div className="flex justify-end gap-3 pt-1">
-          <button type="button" onClick={() => onOpenChange(false)} className="rounded-xl border border-slate-300 px-4 py-2 font-bold hover:bg-slate-50">Cancelar</button>
-          <button disabled={isSubmitting} className="rounded-xl bg-indigo-600 px-5 py-2 font-bold text-white hover:bg-indigo-700 disabled:opacity-60">{isSubmitting ? "Guardando..." : "Guardar"}</button>
+          <button type="button" onClick={() => onOpenChange(false)} className="btn btn-ghost !py-2">Cancelar</button>
+          <button disabled={isSubmitting} className="btn btn-primary !px-5 !py-2">{isSubmitting ? "Guardando..." : "Guardar"}</button>
         </div>
       </form>
     </AppDialog>

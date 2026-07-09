@@ -24,26 +24,26 @@ export function TaskContextMenu({
   return (
     <>
       <button type="button" aria-label="Cerrar opciones" onClick={onClose} className="fixed inset-0 z-30 cursor-default bg-transparent" />
-      <div style={{ left: position.x, top: position.y }} className="fixed z-40 flex max-h-[min(32rem,calc(100vh-1.5rem))] w-72 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-sm shadow-2xl">
-        <div className="shrink-0 border-b border-slate-100 px-4 py-2">
-          <p className="truncate text-xs font-extrabold uppercase text-slate-500">Opciones de tarea</p>
-          <p className="truncate font-bold text-slate-900">{task.title}</p>
+      <div style={{ left: position.x, top: position.y }} className="fixed z-40 flex max-h-[min(32rem,calc(100vh-1.5rem))] w-72 flex-col overflow-hidden rounded-md border border-[var(--line)] bg-[var(--surface)] text-sm shadow-2xl">
+        <div className="shrink-0 border-b border-[var(--line)] px-4 py-2">
+          <p className="folio truncate uppercase">Opciones de tarea</p>
+          <p className="truncate font-bold text-[var(--ink)]">{task.title}</p>
         </div>
         <div className="overflow-y-auto py-2">
           {isInFolder && (
             <>
-              <button type="button" onClick={() => void onMove(null)} className="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left font-bold hover:bg-slate-50">
+              <button type="button" onClick={() => void onMove(null)} className="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left font-bold hover:bg-[var(--paper-deep)]">
                 <Inbox size={16} /> Sacar de carpeta
               </button>
-              <div className="my-1 border-t border-slate-100" />
+              <div className="my-1 border-t border-[var(--line)]" />
             </>
           )}
-          <p className="px-4 py-2 text-xs font-extrabold uppercase text-slate-500">Mover a carpeta</p>
+          <p className="folio px-4 py-2 uppercase">Mover a carpeta</p>
           {folderOptions.length === 0 ? (
-            <p className="px-4 py-2 text-sm text-slate-500">No hay carpetas creadas.</p>
+            <p className="px-4 py-2 text-sm text-[var(--ink-soft)]">No hay carpetas creadas.</p>
           ) : folderOptions.map(({ folder, depth }) => (
-            <button key={folder.id} type="button" disabled={folder.id === task.folder_id} onClick={() => void onMove(folder.id)} className="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45" style={{ paddingLeft: `${16 + depth * 16}px` }}>
-              <Folder size={16} className="text-amber-700" /> <span className="truncate">{folder.name}</span>
+            <button key={folder.id} type="button" disabled={folder.id === task.folder_id} onClick={() => void onMove(folder.id)} className="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left font-semibold hover:bg-[var(--paper-deep)] disabled:cursor-not-allowed disabled:opacity-45" style={{ paddingLeft: `${16 + depth * 16}px` }}>
+              <Folder size={16} className="text-[#9A7B24]" /> <span className="truncate">{folder.name}</span>
             </button>
           ))}
         </div>

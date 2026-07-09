@@ -18,7 +18,7 @@ export function TaskTimingInfo({ task, detailed = false, compact = false }: { ta
   return (
     <div className={compact ? "mt-2" : "mt-4"}>
       {detailed && (
-        <div className={`flex items-start gap-3 rounded-xl border p-3 ${task.reminders_enabled ? "border-amber-200 bg-amber-50 text-amber-950" : "border-slate-200 bg-white/70 text-slate-600"}`}>
+        <div className={`flex items-start gap-3 rounded-md border p-3 ${task.reminders_enabled ? "border-[#9A7B24] bg-[#F3EDDC] text-[#6b5619]" : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink-soft)]"}`}>
           <BellRing className="mt-0.5 shrink-0" size={18} />
           <div>
             <p className="text-sm font-bold">{task.reminders_enabled ? "Recordatorio activo" : "Sin recordatorios"}</p>
@@ -29,17 +29,17 @@ export function TaskTimingInfo({ task, detailed = false, compact = false }: { ta
 
       {target && (
         <div className={detailed ? "mt-3" : ""}>
-          <div className="mb-1.5 flex items-center justify-between gap-3 text-xs font-semibold text-slate-600">
+          <div className="mb-1.5 flex items-center justify-between gap-3 text-xs font-semibold text-[var(--ink-soft)]">
             <span className="flex min-w-0 items-center gap-1.5">
-              {target.kind === "reminder" ? <BellRing className="shrink-0 text-amber-700" size={14} /> : <CalendarClock className="shrink-0 text-indigo-700" size={14} />}
+              {target.kind === "reminder" ? <BellRing className="shrink-0 text-[#9A7B24]" size={14} /> : <CalendarClock className="shrink-0 text-[var(--primary)]" size={14} />}
               <span className="truncate">{target.kind === "reminder" ? "Próximo recordatorio" : "Fecha límite"}</span>
             </span>
-            <span className="shrink-0">{formatRemaining(target.at.getTime() - now.getTime())}</span>
+            <span className="folio shrink-0">{formatRemaining(target.at.getTime() - now.getTime())}</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-slate-200/80" role="progressbar" aria-label={`Tiempo restante para ${target.kind === "reminder" ? "el próximo recordatorio" : "la fecha límite"}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(target.progress)}>
-            <div className={`h-full rounded-full transition-[width] duration-500 ${target.kind === "reminder" ? "bg-amber-500" : "bg-indigo-600"}`} style={{ width: `${target.progress}%` }} />
+          <div className="h-2 overflow-hidden rounded-full bg-[var(--paper-deep)]" role="progressbar" aria-label={`Tiempo restante para ${target.kind === "reminder" ? "el próximo recordatorio" : "la fecha límite"}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(target.progress)}>
+            <div className={`h-full rounded-full transition-[width] duration-500 ${target.kind === "reminder" ? "bg-[#9A7B24]" : "bg-[var(--primary)]"}`} style={{ width: `${target.progress}%` }} />
           </div>
-          {!compact && <p className="mt-1.5 text-right text-[11px] text-slate-500">{target.at.toLocaleString("es-EC", { dateStyle: "medium", timeStyle: "short" })}</p>}
+          {!compact && <p className="folio mt-1.5 text-right">{target.at.toLocaleString("es-EC", { dateStyle: "medium", timeStyle: "short" })}</p>}
         </div>
       )}
     </div>
