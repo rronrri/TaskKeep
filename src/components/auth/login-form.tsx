@@ -24,10 +24,10 @@ export function LoginForm() {
   };
   return (
     <form onSubmit={handleSubmit(submit)} className="space-y-5" noValidate>
-      <div><label htmlFor="email" className="mb-2 block text-sm font-semibold">Correo electrónico</label><input id="email" type="email" autoComplete="email" {...register("email")} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3" />{errors.email && <p className="mt-1 text-sm text-red-700">{errors.email.message}</p>}</div>
-      <div><div className="mb-2 flex items-center justify-between"><label htmlFor="password" className="block text-sm font-semibold">Contraseña</label><Link href="/forgot-password" className="text-xs font-bold text-indigo-700">¿La olvidaste?</Link></div><input id="password" type="password" autoComplete="current-password" {...register("password")} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3" />{errors.password && <p className="mt-1 text-sm text-red-700">{errors.password.message}</p>}</div>
-      {serverError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{serverError}</p>}
-      <button disabled={isSubmitting} className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white hover:bg-indigo-700 disabled:opacity-60">{isSubmitting ? "Ingresando…" : "Ingresar"}</button>
+      <div><label htmlFor="email" className="mb-2 block text-sm font-semibold">Correo electrónico</label><input id="email" type="email" autoComplete="email" {...register("email")} className="input" />{errors.email && <p className="mt-1 text-sm text-[var(--stamp-red)]">{errors.email.message}</p>}</div>
+      <div><div className="mb-2 flex items-center justify-between"><label htmlFor="password" className="block text-sm font-semibold">Contraseña</label><Link href="/forgot-password" className="text-xs font-bold text-[var(--primary)]">¿La olvidaste?</Link></div><input id="password" type="password" autoComplete="current-password" {...register("password")} className="input" />{errors.password && <p className="mt-1 text-sm text-[var(--stamp-red)]">{errors.password.message}</p>}</div>
+      {serverError && <p role="alert" className="rounded-md bg-[var(--stamp-red-wash)] p-3 text-sm text-[var(--stamp-red)]">{serverError}</p>}
+      <button disabled={isSubmitting} className="btn btn-primary w-full !py-3">{isSubmitting ? "Ingresando…" : "Ingresar"}</button>
     </form>
   );
 }
