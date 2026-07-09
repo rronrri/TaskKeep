@@ -17,12 +17,6 @@ import type { Task, TaskFolder, TaskStatus } from "@/types";
 
 interface Responsible extends ResponsibleOption { email: string; }
 
-const statusStamp: Record<TaskStatus, string> = {
-  pending: "stamp stamp-neutral",
-  in_progress: "stamp stamp-primary",
-  completed: "stamp stamp-success",
-};
-
 export function ManagerTaskBoard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [responsibles, setResponsibles] = useState<Responsible[]>([]);
