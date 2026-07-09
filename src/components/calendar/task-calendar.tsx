@@ -146,25 +146,25 @@ export function TaskCalendar() {
 
   return (
     <section>
-      <p className="text-sm font-bold text-indigo-600">PLANIFICACIÓN</p>
-      <h1 className="font-display text-3xl font-extrabold">Calendario</h1>
-      <p className="mt-2 text-slate-600">Selecciona un día para previsualizar sus tareas o pulsa un evento para abrirlo.</p>
+      <p className="folio !text-[var(--primary)]">PLANIFICACIÓN</p>
+      <h1 className="font-display text-3xl font-bold">Calendario</h1>
+      <p className="mt-2 text-[var(--ink-soft)]">Selecciona un día para previsualizar sus tareas o pulsa un evento para abrirlo.</p>
       <ToastMessages success={notice} error={serverError} onClearSuccess={() => setNotice("")} onClearError={() => setServerError("")} />
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="card overflow-hidden p-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
-            <h2 className="font-display text-xl font-extrabold capitalize">{calendarTitle}</h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] pb-4">
+            <h2 className="font-display text-xl font-bold capitalize">{calendarTitle}</h2>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => moveCalendar("today")} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold hover:bg-slate-50">Hoy</button>
-              <button type="button" onClick={() => moveCalendar("prev")} className="rounded-xl border border-slate-300 bg-white p-2.5 hover:bg-slate-50" aria-label="Mes anterior"><ChevronLeft size={19} /></button>
-              <button type="button" onClick={() => moveCalendar("next")} className="rounded-xl border border-slate-300 bg-white p-2.5 hover:bg-slate-50" aria-label="Mes siguiente"><ChevronRight size={19} /></button>
+              <button type="button" onClick={() => moveCalendar("today")} className="btn btn-ghost !px-3 !py-2 text-sm">Hoy</button>
+              <button type="button" onClick={() => moveCalendar("prev")} className="btn btn-ghost !p-2.5" aria-label="Mes anterior"><ChevronLeft size={19} /></button>
+              <button type="button" onClick={() => moveCalendar("next")} className="btn btn-ghost !p-2.5" aria-label="Mes siguiente"><ChevronRight size={19} /></button>
             </div>
           </div>
-          <div className="mb-4 flex flex-wrap gap-4 text-xs font-semibold text-slate-600">
-            <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-indigo-600" /> Fechas límite</span>
-            <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-600" /> Avisos puntuales</span>
-            <span className="text-slate-400">Los recordatorios recurrentes están resumidos a la derecha.</span>
+          <div className="mb-4 flex flex-wrap gap-4 text-xs font-semibold text-[var(--ink-soft)]">
+            <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-[var(--primary)]" /> Fechas límite</span>
+            <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-[#9A7B24]" /> Avisos puntuales</span>
+            <span className="text-[var(--line-strong)]">Los recordatorios recurrentes están resumidos a la derecha.</span>
           </div>
           <FullCalendar
             ref={calendarRef}
@@ -189,45 +189,45 @@ export function TaskCalendar() {
           />
         </div>
         <aside className="card h-fit p-5">
-          <div className="flex items-center gap-3"><span className="rounded-xl bg-indigo-100 p-2 text-indigo-700"><CalendarDays size={20} /></span><div><p className="text-xs font-bold uppercase text-slate-500">Vista previa</p><h2 className="font-display font-extrabold">{new Date(`${selectedDate}T12:00:00`).toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" })}</h2></div></div>
+          <div className="flex items-center gap-3"><span className="rounded-md bg-[var(--primary-wash)] p-2 text-[var(--primary)]"><CalendarDays size={20} /></span><div><p className="folio uppercase">Vista previa</p><h2 className="font-display font-bold">{new Date(`${selectedDate}T12:00:00`).toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" })}</h2></div></div>
           {recurringTasks.length > 0 && (
-            <button type="button" onClick={() => setRecurringModalOpen(true)} className="mt-5 flex w-full items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-left hover:border-amber-300 hover:bg-amber-100/70">
-              <span className="rounded-xl bg-white p-2 text-amber-700"><BellRing size={19} /></span>
-              <span className="min-w-0 flex-1"><span className="block text-xs font-extrabold uppercase text-amber-800">Recordatorios recurrentes</span><span className="mt-1 block text-sm text-slate-700">{recurringTasks.length} {recurringTasks.length === 1 ? "recordatorio activo" : "recordatorios activos"}</span></span>
-              <Eye className="shrink-0 text-amber-800" size={20} aria-hidden="true" />
+            <button type="button" onClick={() => setRecurringModalOpen(true)} className="mt-5 flex w-full items-center gap-3 rounded-md border border-[#d9c98f] bg-[#F3EDDC] p-4 text-left hover:border-[#9A7B24]">
+              <span className="rounded-md bg-[var(--surface)] p-2 text-[#9A7B24]"><BellRing size={19} /></span>
+              <span className="min-w-0 flex-1"><span className="block text-xs font-bold uppercase text-[#6b5619]">Recordatorios recurrentes</span><span className="mt-1 block text-sm text-[var(--ink)]">{recurringTasks.length} {recurringTasks.length === 1 ? "recordatorio activo" : "recordatorios activos"}</span></span>
+              <Eye className="shrink-0 text-[#6b5619]" size={20} aria-hidden="true" />
             </button>
           )}
-          <p className="mt-5 text-xs font-extrabold uppercase text-slate-500">En este día</p>
-          {selectedEvents.length === 0 ? <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No hay tareas ni recordatorios para este día.</p> : (
-            <button type="button" onClick={() => setDayEventsModalOpen(true)} className="mt-4 flex w-full items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-left hover:border-indigo-300 hover:bg-indigo-100/70">
-              <span className="rounded-xl bg-white p-2 text-indigo-700"><CalendarDays size={19} /></span>
-              <span className="min-w-0 flex-1"><span className="block text-xs font-extrabold uppercase text-indigo-800">Actividad del día</span><span className="mt-1 block text-sm text-slate-700">{selectedEvents.length} {selectedEvents.length === 1 ? "elemento" : "elementos"}</span></span>
-              <Eye className="shrink-0 text-indigo-800" size={20} aria-hidden="true" />
+          <p className="folio mt-5 uppercase">En este día</p>
+          {selectedEvents.length === 0 ? <p className="mt-4 rounded-md bg-[var(--paper)] p-4 text-sm text-[var(--ink-soft)]">No hay tareas ni recordatorios para este día.</p> : (
+            <button type="button" onClick={() => setDayEventsModalOpen(true)} className="mt-4 flex w-full items-center gap-3 rounded-md border border-[var(--primary)] bg-[var(--primary-wash)] p-4 text-left hover:border-[var(--primary-strong)]">
+              <span className="rounded-md bg-[var(--surface)] p-2 text-[var(--primary)]"><CalendarDays size={19} /></span>
+              <span className="min-w-0 flex-1"><span className="block text-xs font-bold uppercase text-[var(--primary)]">Actividad del día</span><span className="mt-1 block text-sm text-[var(--ink)]">{selectedEvents.length} {selectedEvents.length === 1 ? "elemento" : "elementos"}</span></span>
+              <Eye className="shrink-0 text-[var(--primary)]" size={20} aria-hidden="true" />
             </button>
           )}
         </aside>
       </div>
 
       <AppDialog open={dayEventsModalOpen} onOpenChange={setDayEventsModalOpen} title="Actividad del dia" description={new Date(`${selectedDate}T12:00:00`).toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" })} size="lg" scrollable={false}>
-        <div className="max-h-[60vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white">
-          <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.8fr)_minmax(8rem,0.7fr)_auto] gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-extrabold uppercase tracking-wide text-slate-500 md:grid">
+        <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+          <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.8fr)_minmax(8rem,0.7fr)_auto] gap-4 border-b border-[var(--line)] bg-[var(--paper)] px-4 py-3 text-xs font-bold uppercase tracking-wide text-[var(--ink-soft)] md:grid">
             <span>Tarea</span><span>Tipo y hora</span><span>Responsable</span><span>Prioridad</span>
           </div>
-          <div className="divide-y divide-slate-200">
+          <div className="divide-y divide-[var(--line)]">
             {selectedEvents.map((event) => {
               const task = tasks.find((candidate) => candidate.id === event.taskId);
               if (!task) return null;
               const priority = priorityStyles[task.priority];
               const isReminder = event.kind === "reminder";
               return (
-                <button key={event.id} type="button" onClick={() => { setDayEventsModalOpen(false); setPreview(task); }} className={`grid w-full gap-2 px-4 py-3 text-left md:grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.8fr)_minmax(8rem,0.7fr)_auto] md:items-center md:gap-4 ${isReminder ? "hover:bg-amber-50/70" : "hover:bg-indigo-50/70"}`}>
+                <button key={event.id} type="button" onClick={() => { setDayEventsModalOpen(false); setPreview(task); }} className="grid w-full gap-2 px-4 py-3 text-left hover:bg-[var(--paper)] md:grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.8fr)_minmax(8rem,0.7fr)_auto] md:items-center md:gap-4">
                   <span className="flex min-w-0 items-center gap-3">
-                    <span className={`rounded-lg p-2 ${isReminder ? "bg-amber-100 text-amber-700" : "bg-indigo-100 text-indigo-700"}`}>{isReminder ? <BellRing size={17} /> : <CalendarDays size={17} />}</span>
-                    <span className="min-w-0"><span className="block truncate font-bold text-slate-900">{task.title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">Abrir detalle de la tarea</span></span>
+                    <span className={`rounded-md p-2 ${isReminder ? "bg-[#F3EDDC] text-[#9A7B24]" : "bg-[var(--primary-wash)] text-[var(--primary)]"}`}>{isReminder ? <BellRing size={17} /> : <CalendarDays size={17} />}</span>
+                    <span className="min-w-0"><span className="block truncate font-bold text-[var(--ink)]">{task.title}</span><span className="mt-0.5 block truncate text-xs text-[var(--ink-soft)]">Abrir detalle de la tarea</span></span>
                   </span>
-                  <span className={`text-sm font-semibold ${isReminder ? "text-amber-800" : "text-indigo-800"}`}>{isReminder ? "Recordatorio" : "Fecha limite"} · {new Date(event.start).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" })}</span>
-                  <span className="truncate text-sm text-slate-600">{task.responsible?.full_name ?? "Sin nombre"}</span>
-                  <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-bold ${priority.badge}`}>{priority.label}</span>
+                  <span className={`text-sm font-semibold ${isReminder ? "text-[#6b5619]" : "text-[var(--primary)]"}`}>{isReminder ? "Recordatorio" : "Fecha limite"} · {new Date(event.start).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="truncate text-sm text-[var(--ink-soft)]">{task.responsible?.full_name ?? "Sin nombre"}</span>
+                  <span className={`w-fit ${priority.badge}`}>{priority.label}</span>
                 </button>
               );
             })}
@@ -236,19 +236,19 @@ export function TaskCalendar() {
       </AppDialog>
 
       <AppDialog open={recurringModalOpen} onOpenChange={(open) => { setRecurringModalOpen(open); if (!open && !preview && !editorOpen) setReturnToRecurring(false); }} title="Recordatorios recurrentes" description="Consulta todos los avisos diarios y mensuales activos. Pulsa uno para abrir la tarea." size="lg" scrollable={false}>
-        <div className="max-h-[60vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white">
-          <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.8fr)_minmax(8rem,0.7fr)_auto] gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-extrabold uppercase tracking-wide text-slate-500 md:grid">
+        <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+          <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.8fr)_minmax(8rem,0.7fr)_auto] gap-4 border-b border-[var(--line)] bg-[var(--paper)] px-4 py-3 text-xs font-bold uppercase tracking-wide text-[var(--ink-soft)] md:grid">
             <span>Tarea</span><span>Frecuencia</span><span>Responsable</span><span>Prioridad</span>
           </div>
-          <div className="divide-y divide-slate-200">
+          <div className="divide-y divide-[var(--line)]">
           {recurringTasks.map((task) => {
             const priority = priorityStyles[task.priority];
             return (
-              <button key={task.id} type="button" onClick={() => openRecurringTask(task)} className="grid w-full gap-2 px-4 py-3 text-left hover:bg-amber-50/60 md:grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.8fr)_minmax(8rem,0.7fr)_auto] md:items-center md:gap-4">
-                <span className="flex min-w-0 items-center gap-3"><span className="rounded-lg bg-amber-100 p-2 text-amber-700"><BellRing size={17} /></span><span className="min-w-0"><span className="block truncate font-bold text-slate-900">{task.title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">Abrir detalle de la tarea</span></span></span>
-                <span className="text-sm font-semibold text-amber-800">{recurringLabel(task)}</span>
-                <span className="truncate text-sm text-slate-600">{task.responsible?.full_name ?? "Sin nombre"}</span>
-                <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-bold ${priority.badge}`}>{priority.label}</span>
+              <button key={task.id} type="button" onClick={() => openRecurringTask(task)} className="grid w-full gap-2 px-4 py-3 text-left hover:bg-[var(--paper)] md:grid-cols-[minmax(0,1.5fr)_minmax(9rem,0.8fr)_minmax(8rem,0.7fr)_auto] md:items-center md:gap-4">
+                <span className="flex min-w-0 items-center gap-3"><span className="rounded-md bg-[#F3EDDC] p-2 text-[#9A7B24]"><BellRing size={17} /></span><span className="min-w-0"><span className="block truncate font-bold text-[var(--ink)]">{task.title}</span><span className="mt-0.5 block truncate text-xs text-[var(--ink-soft)]">Abrir detalle de la tarea</span></span></span>
+                <span className="text-sm font-semibold text-[#6b5619]">{recurringLabel(task)}</span>
+                <span className="truncate text-sm text-[var(--ink-soft)]">{task.responsible?.full_name ?? "Sin nombre"}</span>
+                <span className={`w-fit ${priority.badge}`}>{priority.label}</span>
               </button>
             );
           })}
@@ -351,7 +351,7 @@ function calendarEvent(task: Task, date: Date, kind: "reminder" | "deadline"): C
     id: `${task.id}:${kind}:${date.getTime()}`,
     title: `${kind === "reminder" ? "Recordatorio" : "Fecha límite"}: ${task.title}`,
     start: date.toISOString(),
-    color: kind === "reminder" ? "#d97706" : priorityStyles[task.priority].calendar,
+    color: kind === "reminder" ? "#9a7b24" : priorityStyles[task.priority].calendar,
     textColor: "#ffffff",
     taskId: task.id,
     kind,
