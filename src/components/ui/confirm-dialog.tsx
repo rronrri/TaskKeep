@@ -39,11 +39,11 @@ export function ConfirmDialog({
       {requiredText && (
         <label className="block text-sm font-semibold">
           Escribe <strong>{requiredText}</strong> para confirmar
-          <input value={text} onChange={(event) => setText(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5" />
+          <input value={text} onChange={(event) => setText(event.target.value)} className="input mt-2" />
         </label>
       )}
       <div className="mt-6 flex justify-end gap-3">
-        <button type="button" onClick={() => { setText(""); onOpenChange(false); }} className="rounded-xl border border-slate-300 px-4 py-2.5 font-bold">Cancelar</button>
+        <button type="button" onClick={() => { setText(""); onOpenChange(false); }} className="btn btn-ghost">Cancelar</button>
         <button
           type="button"
           disabled={!enabled || busy}
@@ -57,7 +57,7 @@ export function ConfirmDialog({
               setBusy(false);
             }
           }}
-          className={`rounded-xl px-4 py-2.5 font-bold text-white disabled:opacity-50 ${danger ? "bg-red-600 hover:bg-red-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
+          className={`btn ${danger ? "btn-danger" : "btn-primary"}`}
         >
           {busy ? "Procesando..." : confirmLabel}
         </button>

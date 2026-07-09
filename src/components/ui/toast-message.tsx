@@ -36,18 +36,18 @@ function Toast({ message, type, action, onClose }: { message: string; type: "suc
 
   const success = type === "success";
   return (
-    <div role={success ? "status" : "alert"} className={`pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-2xl border p-4 shadow-xl backdrop-blur ${success ? "border-emerald-200 bg-emerald-50/95 text-emerald-950" : "border-red-200 bg-red-50/95 text-red-950"}`}>
-      {success ? <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-600" size={20} /> : <CircleAlert className="mt-0.5 shrink-0 text-red-600" size={20} />}
+    <div role={success ? "status" : "alert"} className={`pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-lg border border-l-[3px] border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--ink)] shadow-xl ${success ? "border-l-[var(--prio-low)]" : "border-l-[var(--stamp-red)]"}`}>
+      {success ? <CheckCircle2 className="mt-0.5 shrink-0 text-[var(--prio-low)]" size={20} /> : <CircleAlert className="mt-0.5 shrink-0 text-[var(--stamp-red)]" size={20} />}
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold leading-5">{message}</p>
         {action && (
-          <button type="button" onClick={() => void action.onClick()} className="mt-2 rounded-lg bg-white/80 px-3 py-1.5 text-xs font-extrabold text-emerald-800 shadow-sm hover:bg-white">
+          <button type="button" onClick={() => void action.onClick()} className="btn btn-ghost mt-2 !px-3 !py-1.5 text-xs">
             {action.label}
           </button>
         )}
       </div>
-      <button type="button" onClick={onClose} className="rounded-lg p-1 opacity-60 hover:bg-black/5 hover:opacity-100" aria-label="Cerrar notificacion"><X size={16} /></button>
-      <span className={`absolute bottom-0 left-0 h-1 animate-[toast-life_5s_linear_forwards] rounded-b-2xl ${success ? "bg-emerald-500" : "bg-red-500"}`} />
+      <button type="button" onClick={onClose} className="rounded-md p-1 opacity-60 hover:bg-[var(--paper-deep)] hover:opacity-100" aria-label="Cerrar notificacion"><X size={16} /></button>
+      <span className={`absolute bottom-0 left-0 h-1 animate-[toast-life_5s_linear_forwards] rounded-b-lg ${success ? "bg-[var(--prio-low)]" : "bg-[var(--stamp-red)]"}`} />
     </div>
   );
 }

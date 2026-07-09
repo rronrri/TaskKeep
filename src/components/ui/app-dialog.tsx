@@ -24,13 +24,13 @@ export function AppDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-sm" />
-        <Dialog.Content className={`fixed left-1/2 top-1/2 z-50 max-h-[94vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl ${scrollable ? "overflow-y-auto" : "overflow-hidden"} ${width}`}>
-          <div className="mb-6 pr-10">
-            <Dialog.Title className="font-display text-2xl font-extrabold">{title}</Dialog.Title>
-            {description && <Dialog.Description className="mt-2 text-sm text-slate-600">{description}</Dialog.Description>}
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-[rgb(20_28_26/0.6)] backdrop-blur-sm" />
+        <Dialog.Content className={`fixed left-1/2 top-1/2 z-50 max-h-[94vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-[10px] border border-[var(--line)] bg-[var(--surface)] p-6 shadow-2xl animate-[dialog-in_180ms_ease-out] ${scrollable ? "overflow-y-auto" : "overflow-hidden"} ${width}`}>
+          <div className="mb-6 border-b border-[var(--line)] pb-4 pr-10">
+            <Dialog.Title className="font-display text-2xl font-bold">{title}</Dialog.Title>
+            {description && <Dialog.Description className="mt-2 text-sm text-[var(--ink-soft)]">{description}</Dialog.Description>}
           </div>
-          <Dialog.Close className="absolute right-5 top-5 rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Cerrar">
+          <Dialog.Close className="absolute right-5 top-5 rounded-md p-2 text-[var(--ink-soft)] hover:bg-[var(--paper-deep)]" aria-label="Cerrar">
             <X size={20} />
           </Dialog.Close>
           {children}
