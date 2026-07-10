@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useMemo, useState } from "react";
-import { ChevronRight, ClipboardList, Folder, FolderOpen, FolderPlus, Inbox, Layers3, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, ClipboardList, Folder, FolderOpen, FolderPlus, Plus, Trash2 } from "lucide-react";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FolderContextMenu } from "./folder-context-menu";
@@ -43,14 +43,50 @@ export function TaskFolderExplorer({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
   const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
-  const tree = useMemo(() => flattenTree(folders), [folders]);
+  const childrenByParent = useMemo(() => groupChildren(folders), [folders]);
   const normalizedSearch = searchQuery.trim().toLowerCase();
-  const visibleTree = normalizedSearch ? tree.filter(({ folder }) => folder.name.toLowerCase().includes(normalizedSearch)) : tree;
   const currentParentId = typeof selected === "string" && selected !== "all" && selected !== "none" ? selected : null;
   const breadcrumbs = useMemo(() => buildBreadcrumbs(currentParentId, folderById), [currentParentId, folderById]);
-  const selectedFolderName = currentParentId ? folderById.get(currentParentId)?.name ?? "Carpeta" : selected === "all" ? "Todas las tareas" : "Mi unidad";
+  const selectedFolderName = currentParentId ? folderById.get(currentParentId)?.name ?? "Carpeta" : "Mi unidad";
+
+  const selectFolder = (folderId: string) => {
+    setExpanded((current) => {
+      const next = new Set(current);
+      for (const folder of buildBreadcrumbs(folderId, folderById)) next.add(folder.id);
+      return next;
+    });
+    onSelect(folderId);
+  };
+
+  const visibleTree = useMemo(() => {
+    if (normalizedSearch) {
+      return folders
+        .filter((folder) => folder.name.toLowerCase().includes(normalizedSearch))
+        .map((folder) => ({ folder, depth: 0, hasChildren: false }));
+    }
+    const result: Array<{ folder: TaskFolder; depth: number; hasChildren: boolean }> = [];
+    const visit = (parentId: string | null, depth: number) => {
+      for (const folder of childrenByParent.get(parentId) ?? []) {
+        const hasChildren = (childrenByParent.get(folder.id) ?? []).length > 0;
+        result.push({ folder, depth, hasChildren });
+        if (hasChildren && expanded.has(folder.id)) visit(folder.id, depth + 1);
+      }
+    };
+    visit(null, 0);
+    return result;
+  }, [childrenByParent, expanded, folders, normalizedSearch]);
+
+  const toggleExpanded = (folderId: string) => {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(folderId)) next.delete(folderId);
+      else next.add(folderId);
+      return next;
+    });
+  };
 
   const openCreate = () => {
     setParentId(currentParentId);
@@ -111,17 +147,17 @@ export function TaskFolderExplorer({
             <button type="button" onClick={openCreate} className="btn btn-ghost !py-2.5 text-sm"><FolderPlus size={17} /> Nueva carpeta</button>
           </div>
 
-          <nav aria-label="Carpetas" className="mt-5 space-y-0.5">
-            <div className={dropTarget === "root" ? "rounded-md ring-2 ring-[var(--primary)]" : ""} {...dragProps("root", null)}>
-              <TreeItem icon={Inbox} label="Mi unidad" active={selected === "none"} onClick={() => onSelect("none")} />
-            </div>
-            <TreeItem icon={Layers3} label="Todas las tareas" active={selected === "all"} onClick={() => onSelect("all")} />
-
-            <p className="folio px-2 pb-1 pt-4 uppercase">Carpetas</p>
+          <nav
+            aria-label="Carpetas"
+            {...dragProps("root", null)}
+            className={`mt-5 min-h-[16rem] space-y-0.5 rounded-md pb-6 ${dropTarget === "root" ? "ring-2 ring-[var(--primary)]" : ""}`}
+          >
+            <p className="folio px-2 pb-1 uppercase">Carpetas</p>
             {visibleTree.length === 0 ? (
               <p className="px-2 py-1 text-xs text-[var(--ink-soft)]">{normalizedSearch ? "No hay carpetas que coincidan." : "Todavía no hay carpetas."}</p>
-            ) : visibleTree.map(({ folder, depth }) => {
+            ) : visibleTree.map(({ folder, depth, hasChildren }) => {
               const active = selected === folder.id;
+              const isExpanded = expanded.has(folder.id);
               return (
                 <div
                   key={folder.id}
@@ -130,10 +166,17 @@ export function TaskFolderExplorer({
                   onContextMenu={(event) => openFolderMenu(event, folder)}
                   {...dragProps(folder.id, folder.id)}
                   className={`group flex cursor-grab items-center rounded-md active:cursor-grabbing ${dropTarget === folder.id ? "ring-2 ring-[var(--primary)]" : ""} ${active ? "border-l-[3px] border-[var(--primary)] bg-[var(--primary-wash)]" : "border-l-[3px] border-transparent hover:bg-[var(--paper-deep)]"}`}
-                  style={{ paddingLeft: `${4 + (normalizedSearch ? 0 : depth) * 14}px` }}
+                  style={{ paddingLeft: `${2 + depth * 14}px` }}
                 >
-                  <button type="button" onClick={() => onSelect(folder.id)} className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-2 text-left text-sm font-semibold ${active ? "text-[var(--primary)]" : "text-[var(--ink)]"}`}>
-                    {active ? <FolderOpen size={16} className="shrink-0 text-[#9A7B24]" /> : <Folder size={16} className="shrink-0 text-[#9A7B24]" />}
+                  {hasChildren ? (
+                    <button type="button" onClick={(event) => { event.stopPropagation(); toggleExpanded(folder.id); }} className="shrink-0 rounded p-0.5 text-[var(--ink-soft)] hover:bg-[var(--line)]" aria-label={isExpanded ? `Contraer ${folder.name}` : `Expandir ${folder.name}`} aria-expanded={isExpanded}>
+                      <ChevronRight size={14} className={`transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                    </button>
+                  ) : (
+                    <span className="w-[19px] shrink-0" />
+                  )}
+                  <button type="button" onClick={() => selectFolder(folder.id)} className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-2 pl-0.5 pr-2 text-left text-sm font-semibold ${active ? "text-[var(--primary)]" : "text-[var(--ink)]"}`}>
+                    {active || isExpanded ? <FolderOpen size={16} className="shrink-0 text-[#9A7B24]" /> : <Folder size={16} className="shrink-0 text-[#9A7B24]" />}
                     <span className="truncate">{folder.name}</span>
                   </button>
                   <button type="button" onClick={() => setDeleteTarget(folder)} className="mr-1 shrink-0 rounded p-1 text-[var(--stamp-red)] opacity-0 hover:bg-[var(--stamp-red-wash)] focus:opacity-100 group-hover:opacity-100" aria-label={`Eliminar carpeta ${folder.name}`}>
@@ -142,6 +185,7 @@ export function TaskFolderExplorer({
                 </div>
               );
             })}
+            <p className="folio px-2 pt-3 text-[10px] uppercase opacity-70">Arrastra aquí abajo para sacar una carpeta a Mi unidad</p>
           </nav>
         </aside>
 
@@ -154,11 +198,10 @@ export function TaskFolderExplorer({
               <span key={folder.id} className="inline-flex items-center gap-2">
                 <ChevronRight size={15} className="text-[var(--line-strong)]" />
                 <span className={`inline-flex rounded-md ${dropTarget === `crumb-${folder.id}` ? "ring-2 ring-[var(--primary)]" : ""}`} {...dragProps(`crumb-${folder.id}`, folder.id)}>
-                  <button type="button" onClick={() => onSelect(folder.id)} className={`cursor-pointer rounded-md px-2 py-1 hover:bg-[var(--paper-deep)] ${selected === folder.id ? "bg-[var(--primary-wash)] text-[var(--primary)]" : ""}`}>{folder.name}</button>
+                  <button type="button" onClick={() => selectFolder(folder.id)} className={`cursor-pointer rounded-md px-2 py-1 hover:bg-[var(--paper-deep)] ${selected === folder.id ? "bg-[var(--primary-wash)] text-[var(--primary)]" : ""}`}>{folder.name}</button>
                 </span>
               </span>
             ))}
-            {selected === "all" && <span className="inline-flex items-center gap-2"><ChevronRight size={15} className="text-[var(--line-strong)]" />Todas las tareas</span>}
           </div>
 
           <p className="mb-3 mt-4 flex items-center gap-2 font-display text-sm font-bold text-[var(--ink)]"><ClipboardList size={16} className="text-[var(--ink-soft)]" />{selectedFolderName}</p>
@@ -194,26 +237,10 @@ export function TaskFolderExplorer({
   );
 }
 
-function TreeItem({ icon: Icon, label, active, onClick }: { icon: typeof Folder; label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} className={`flex w-full cursor-pointer items-center gap-2 rounded-md border-l-[3px] px-2 py-2 text-left text-sm font-semibold ${active ? "border-[var(--primary)] bg-[var(--primary-wash)] text-[var(--primary)]" : "border-transparent text-[var(--ink)] hover:bg-[var(--paper-deep)]"}`}>
-      <Icon size={16} className="shrink-0" /><span className="truncate">{label}</span>
-    </button>
-  );
-}
-
-function flattenTree(folders: TaskFolder[]) {
-  const children = new Map<string | null, TaskFolder[]>();
-  for (const folder of folders) children.set(folder.parent_id, [...(children.get(folder.parent_id) ?? []), folder]);
-  const result: Array<{ folder: TaskFolder; depth: number }> = [];
-  const visit = (parentId: string | null, depth: number) => {
-    for (const folder of children.get(parentId) ?? []) {
-      result.push({ folder, depth });
-      visit(folder.id, depth + 1);
-    }
-  };
-  visit(null, 0);
-  return result;
+function groupChildren(folders: TaskFolder[]) {
+  const map = new Map<string | null, TaskFolder[]>();
+  for (const folder of folders) map.set(folder.parent_id, [...(map.get(folder.parent_id) ?? []), folder]);
+  return map;
 }
 
 function collectDescendantIds(folders: TaskFolder[], rootId: string) {
