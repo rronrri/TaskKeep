@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useMemo, useState } from "react";
-import { ChevronRight, ClipboardList, Folder, FolderOpen, FolderPlus, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, ClipboardList, Folder, FolderOpen, FolderPlus, HardDrive, Plus, Trash2 } from "lucide-react";
 import { AppDialog } from "@/components/ui/app-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FolderContextMenu } from "./folder-context-menu";
@@ -153,8 +153,18 @@ export function TaskFolderExplorer({
             className={`mt-5 min-h-[16rem] space-y-0.5 rounded-md pb-6 ${dropTarget === "root" ? "ring-2 ring-[var(--primary)]" : ""}`}
           >
             <p className="folio px-2 pb-1 uppercase">Carpetas</p>
+            <div
+              {...dragProps("root-item", null)}
+              className={`flex items-center rounded-md ${dropTarget === "root-item" ? "ring-2 ring-[var(--primary)]" : ""} ${selected === "none" ? "border-l-[3px] border-[var(--primary)] bg-[var(--primary-wash)]" : "border-l-[3px] border-transparent hover:bg-[var(--paper-deep)]"}`}
+            >
+              <span className="w-[19px] shrink-0" />
+              <button type="button" onClick={() => onSelect("none")} className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-2 pl-0.5 pr-2 text-left text-sm font-bold ${selected === "none" ? "text-[var(--primary)]" : "text-[var(--ink)]"}`}>
+                <HardDrive size={16} className="shrink-0 text-[var(--primary)]" />
+                <span className="truncate">Mi unidad</span>
+              </button>
+            </div>
             {visibleTree.length === 0 ? (
-              <p className="px-2 py-1 text-xs text-[var(--ink-soft)]">{normalizedSearch ? "No hay carpetas que coincidan." : "Todavía no hay carpetas."}</p>
+              <p className="py-1 pl-9 pr-2 text-xs text-[var(--ink-soft)]">{normalizedSearch ? "No hay carpetas que coincidan." : "Todavía no hay carpetas."}</p>
             ) : visibleTree.map(({ folder, depth, hasChildren }) => {
               const active = selected === folder.id;
               const isExpanded = expanded.has(folder.id);
@@ -166,7 +176,7 @@ export function TaskFolderExplorer({
                   onContextMenu={(event) => openFolderMenu(event, folder)}
                   {...dragProps(folder.id, folder.id)}
                   className={`group flex cursor-grab items-center rounded-md active:cursor-grabbing ${dropTarget === folder.id ? "ring-2 ring-[var(--primary)]" : ""} ${active ? "border-l-[3px] border-[var(--primary)] bg-[var(--primary-wash)]" : "border-l-[3px] border-transparent hover:bg-[var(--paper-deep)]"}`}
-                  style={{ paddingLeft: `${2 + depth * 14}px` }}
+                  style={{ paddingLeft: `${2 + (normalizedSearch ? depth : depth + 1) * 14}px` }}
                 >
                   {hasChildren ? (
                     <button type="button" onClick={(event) => { event.stopPropagation(); toggleExpanded(folder.id); }} className="shrink-0 rounded p-0.5 text-[var(--ink-soft)] hover:bg-[var(--line)]" aria-label={isExpanded ? `Contraer ${folder.name}` : `Expandir ${folder.name}`} aria-expanded={isExpanded}>
@@ -185,7 +195,6 @@ export function TaskFolderExplorer({
                 </div>
               );
             })}
-            <p className="folio px-2 pt-3 text-[10px] uppercase opacity-70">Arrastra aquí abajo para sacar una carpeta a Mi unidad</p>
           </nav>
         </aside>
 
