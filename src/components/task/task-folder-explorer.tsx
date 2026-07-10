@@ -43,6 +43,7 @@ export function TaskFolderExplorer({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
   const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
@@ -142,9 +143,19 @@ export function TaskFolderExplorer({
     <>
       <section className="card overflow-visible md:grid md:grid-cols-[260px_1fr]">
         <aside className="border-b border-[var(--line)] bg-[var(--paper)] p-4 md:min-h-[30rem] md:border-b-0 md:border-r md:rounded-l-lg">
-          <div className="grid gap-2">
-            <button type="button" onClick={onNewTask} className="btn btn-primary !py-2.5 text-sm"><Plus size={17} /> Nueva tarea</button>
-            <button type="button" onClick={openCreate} className="btn btn-ghost !py-2.5 text-sm"><FolderPlus size={17} /> Nueva carpeta</button>
+          <div className="relative">
+            <button type="button" onClick={() => setNewMenuOpen((open) => !open)} className="btn btn-primary w-full !py-2.5 text-sm" aria-haspopup="menu" aria-expanded={newMenuOpen}>
+              <Plus size={17} /> Nuevo
+            </button>
+            {newMenuOpen && (
+              <>
+                <button type="button" aria-label="Cerrar menú" onClick={() => setNewMenuOpen(false)} className="fixed inset-0 z-10 cursor-default bg-transparent" />
+                <div className="absolute left-0 right-0 z-20 mt-2 overflow-hidden rounded-md border border-[var(--line)] bg-[var(--surface)] py-2 text-sm font-bold shadow-xl" role="menu">
+                  <button type="button" onClick={() => { setNewMenuOpen(false); onNewTask(); }} className="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left hover:bg-[var(--paper-deep)]" role="menuitem"><ClipboardList size={16} /> Nueva tarea</button>
+                  <button type="button" onClick={() => { setNewMenuOpen(false); openCreate(); }} className="flex w-full cursor-pointer items-center gap-2 px-4 py-2.5 text-left hover:bg-[var(--paper-deep)]" role="menuitem"><FolderPlus size={16} /> Nueva carpeta</button>
+                </div>
+              </>
+            )}
           </div>
 
           <nav
