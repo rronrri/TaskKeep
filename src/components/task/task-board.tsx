@@ -110,6 +110,14 @@ export function TaskBoard({ role }: { role: UserRole }) {
     } : null);
   };
 
+  const moveFolder = async (folderId: string, parentId: string | null) => {
+    const response = await fetch(`/api/task-folders/${folderId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parent_id: parentId }) });
+    const body = await response.json();
+    if (!response.ok) { setServerError(body.error ?? "No se pudo mover la carpeta"); return; }
+    setFolders((current) => current.map((item) => (item.id === folderId ? body.data : item)).sort((a, b) => a.name.localeCompare(b.name)));
+    setNotice(parentId ? "Carpeta movida dentro de otra carpeta." : "Carpeta movida a Mi unidad.");
+  };
+
   const moveTaskToFolder = async (taskId: string, folderId: string | null) => {
     const response = await fetch(`/api/tasks/${taskId}/folder`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folder_id: folderId }) });
     const body = await response.json();
@@ -192,7 +200,7 @@ export function TaskBoard({ role }: { role: UserRole }) {
         onDeadlineTo={(value) => { setPage(1); setDeadlineTo(value); }} onSort={(value) => { setPage(1); setSort(value); }} onViewMode={setViewMode} />
       <ToastMessages success={notice} error={serverError} successAction={noticeAction} onClearSuccess={() => { setNotice(""); setNoticeAction(null); }} onClearError={() => setServerError("")} />
       <div>
-      <TaskFolderExplorer folders={folders} selected={folderSelection} taskCount={tasks.length} searchQuery={search} onSelect={(folder) => { setPage(1); setFolderSelection(folder); }} onCreate={createFolder} onDelete={deleteFolder} onMoveTask={moveTaskToFolder} onNewTask={() => openFullEditor(null)}>
+      <TaskFolderExplorer folders={folders} selected={folderSelection} searchQuery={search} onSelect={(folder) => { setPage(1); setFolderSelection(folder); }} onCreate={createFolder} onDelete={deleteFolder} onMoveTask={moveTaskToFolder} onMoveFolder={moveFolder} onNewTask={() => openFullEditor(null)}>
       {tasks.length === 0 ? <div className="col-span-full rounded-lg border border-dashed border-[var(--line-strong)] bg-[var(--paper-deep)] p-10 text-center text-[var(--ink-soft)]">No hay tareas para este filtro.</div> : viewMode === "cards" ? (
         <>
           {tasks.map((task) => {
