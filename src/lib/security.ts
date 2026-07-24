@@ -5,8 +5,17 @@ const buckets = new Map<string, Bucket>();
 
 export function protectMutation(request: Request, options: { scope: string; limit: number; windowMs?: number }) {
   const origin = request.headers.get("origin");
-  const expected = process.env.APP_URL ? new URL(process.env.APP_URL).origin : null;
-  if (origin && expected && origin !== expected) {
+  const allowedOrigins = new Set<string>();
+  if (process.env.APP_URL) {
+    allowedOrigins.add(new URL(process.env.APP_URL).origin);
+  }
+  // Mismo host de la petición (soporta despliegues detrás de proxy, p. ej. Vercel).
+  const forwardedHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (forwardedHost) {
+    const proto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+    allowedOrigins.add(`${proto}://${forwardedHost.split(",")[0]?.trim()}`);
+  }
+  if (origin && allowedOrigins.size > 0 && !allowedOrigins.has(origin)) {
     return NextResponse.json({ error: "Origen no permitido" }, { status: 403 });
   }
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "local";
