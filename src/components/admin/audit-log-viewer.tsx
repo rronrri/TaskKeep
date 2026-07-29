@@ -59,7 +59,7 @@ export function AuditLogViewer() {
   return (
     <section>
       <p className="folio !text-[var(--primary)]">SEGURIDAD</p>
-      <h1 className="font-display text-3xl font-bold">Auditoría</h1>
+      <h1 className="font-display text-2xl font-bold sm:text-3xl">Auditoría</h1>
       <p className="mt-2 text-[var(--ink-soft)]">Consulta las acciones sensibles realizadas en el sistema.</p>
       <div className="mt-6 flex justify-end">
         <select value={action} onChange={(event) => { setPage(1); setAction(event.target.value); }} className="input !w-auto !py-2">

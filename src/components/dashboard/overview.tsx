@@ -59,7 +59,7 @@ export function Overview({ role }: { role: UserRole }) {
   return (
     <section>
       <p className="folio !text-[var(--primary)]">RESUMEN</p>
-      <h1 className="font-display text-3xl font-bold">Panel de {role === "admin" ? "administración" : "trabajo"}</h1>
+      <h1 className="font-display text-2xl font-bold sm:text-3xl">Panel de {role === "admin" ? "administración" : "trabajo"}</h1>
       <p className="mt-2 text-[var(--ink-soft)]">Consulta lo importante y actúa sobre lo que requiere atención.</p>
       {error && <p role="alert" className="mt-5 rounded-lg bg-[var(--stamp-red-wash)] p-4 text-sm font-semibold text-[var(--stamp-red)]">{error}</p>}
       <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -67,7 +67,7 @@ export function Overview({ role }: { role: UserRole }) {
           <article key={label} className="card p-5">
             <div className={`mb-5 inline-flex rounded-md p-3 ${color}`}><Icon size={22} /></div>
             <p className="text-sm font-semibold text-[var(--ink-soft)]">{label}</p>
-            <p className="mt-1 font-display text-3xl font-bold">{value ?? "…"}</p>
+            <p className="mt-1 font-display text-2xl font-bold sm:text-3xl">{value ?? "…"}</p>
           </article>
         ))}
       </div>
@@ -99,8 +99,8 @@ export function Overview({ role }: { role: UserRole }) {
             </div>
           </div>
           <div className="space-y-4">
-            <article className="card p-5"><div className="mb-3 inline-flex rounded-md bg-[#F6E9DF] p-3 text-[#B4551D]"><CalendarClock size={22} /></div><p className="text-sm font-semibold text-[var(--ink-soft)]">Vencen en 7 días</p><p className="mt-1 font-display text-3xl font-bold">{data?.metrics.dueSoon ?? "…"}</p></article>
-            {role === "manager" && <Link href="/manager/status-requests" className="card block p-5 hover:border-[var(--primary)]"><div className="mb-3 inline-flex rounded-md bg-[var(--primary-wash)] p-3 text-[var(--primary)]"><ClipboardCheck size={22} /></div><p className="text-sm font-semibold text-[var(--ink-soft)]">Aprobaciones pendientes</p><p className="mt-1 font-display text-3xl font-bold">{data?.metrics.pendingRequests ?? "…"}</p></Link>}
+            <article className="card p-5"><div className="mb-3 inline-flex rounded-md bg-[#F6E9DF] p-3 text-[#B4551D]"><CalendarClock size={22} /></div><p className="text-sm font-semibold text-[var(--ink-soft)]">Vencen en 7 días</p><p className="mt-1 font-display text-2xl font-bold sm:text-3xl">{data?.metrics.dueSoon ?? "…"}</p></article>
+            {role === "manager" && <Link href="/manager/status-requests" className="card block p-5 hover:border-[var(--primary)]"><div className="mb-3 inline-flex rounded-md bg-[var(--primary-wash)] p-3 text-[var(--primary)]"><ClipboardCheck size={22} /></div><p className="text-sm font-semibold text-[var(--ink-soft)]">Aprobaciones pendientes</p><p className="mt-1 font-display text-2xl font-bold sm:text-3xl">{data?.metrics.pendingRequests ?? "…"}</p></Link>}
           </div>
         </div>
       )}

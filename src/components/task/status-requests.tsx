@@ -122,7 +122,7 @@ export function StatusRequests() {
   return (
     <section>
       <p className="folio !text-[var(--primary)]">APROBACIONES</p>
-      <h1 className="font-display text-3xl font-bold">Centro de aprobaciones</h1>
+      <h1 className="font-display text-2xl font-bold sm:text-3xl">Centro de aprobaciones</h1>
       <p className="mt-2 text-[var(--ink-soft)]">Revisa cambios de estado y archivos enviados por pasantes.</p>
       {serverError && <p role="alert" className="mt-6 rounded-lg bg-[var(--stamp-red-wash)] p-4 text-sm font-semibold text-[var(--stamp-red)]">{serverError}</p>}
       {notice && <p role="status" className="mt-6 rounded-lg bg-[#E9EFEA] p-4 text-sm font-semibold text-[#4A7058]">{notice}</p>}

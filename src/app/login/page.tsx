@@ -28,7 +28,7 @@ export default async function LoginPage() {
       <section className="flex items-center justify-center p-6">
         <div className="w-full max-w-md">
           <p className="folio mb-2 !text-[var(--primary)] lg:hidden">TASKKEEP</p>
-          <h2 className="font-display text-3xl font-bold">Bienvenido</h2>
+          <h2 className="font-display text-2xl font-bold sm:text-3xl">Bienvenido</h2>
           <p className="mb-8 mt-2 text-[var(--ink-soft)]">Ingresa con tu cuenta empresarial.</p>
           <LoginForm />
         </div>

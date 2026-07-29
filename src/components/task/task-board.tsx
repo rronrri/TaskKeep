@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import { BellRing, CalendarClock, ChevronLeft, ChevronRight, Pencil, Pin, Trash2 } from "lucide-react";
@@ -192,7 +192,7 @@ export function TaskBoard({ role }: { role: UserRole }) {
   return (
     <section>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div><h1 className="font-display text-3xl font-bold">Tareas</h1></div>
+        <div><h1 className="font-display text-2xl font-bold sm:text-3xl">Tareas</h1></div>
       </div>
       <TaskFilters search={search} status={status} priority={priority} deadlineFrom={deadlineFrom} deadlineTo={deadlineTo} sort={sort} viewMode={viewMode}
         onSearch={(value) => { setPage(1); setSearch(value); }} onStatus={(value) => { setPage(1); setStatus(value); }}

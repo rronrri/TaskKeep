@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { CalendarClock, Check, Clock3, FileText, FolderOpen, History, MessageSquare, Pencil, Pin, PinOff, Send, Trash2, Upload, UserRound, X } from "lucide-react";
@@ -10,7 +10,7 @@ import type { Task, TaskStatus, UserRole } from "@/types";
 import { TaskTimingInfo } from "./task-timing-info";
 
 const statusLabels: Record<TaskStatus, string> = { pending: "Pendiente", in_progress: "En curso", completed: "Completada" };
-const requestLabels = { pending_review: "Pendiente de revisiÃ³n", approved: "Aprobada", rejected: "Rechazada" };
+const requestLabels = { pending_review: "Pendiente de revisión", approved: "Aprobada", rejected: "Rechazada" };
 
 interface TaskDetail {
   comments: Array<{ id: string; comment: string; created_at: string; user?: { full_name: string; role: UserRole } | null }>;
@@ -196,15 +196,15 @@ export function TaskPreviewDialog({
   };
 
   return (
-    <AppDialog open onOpenChange={onOpenChange} title={task.title} description="Detalle, conversaciÃ³n y actividad de la tarea." size="lg">
+    <AppDialog open onOpenChange={onOpenChange} title={task.title} description="Detalle, conversación y actividad de la tarea." size="lg">
       <div className={`card ${priority.card} p-5`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className={priority.badge}>{priority.label}</span>
           {task.is_pinned && <span className="flex items-center gap-1 text-xs font-bold"><Pin size={15} /> Fijada</span>}
         </div>
-        <p className="mt-5 whitespace-pre-wrap text-sm leading-6 text-[var(--ink-soft)]">{task.description || "Sin descripciÃ³n."}</p>
+        <p className="mt-5 whitespace-pre-wrap text-sm leading-6 text-[var(--ink-soft)]">{task.description || "Sin descripción."}</p>
         <div className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
-          <p className={`flex items-center gap-2 font-semibold ${overdue ? "text-[var(--stamp-red)]" : ""}`}><CalendarClock size={18} /> {task.deadline ? format(new Date(task.deadline), "d MMM yyyy, HH:mm", { locale: es }) : "Sin fecha lÃ­mite"}{overdue && " Â· Vencida"}</p>
+          <p className={`flex items-center gap-2 font-semibold ${overdue ? "text-[var(--stamp-red)]" : ""}`}><CalendarClock size={18} /> {task.deadline ? format(new Date(task.deadline), "d MMM yyyy, HH:mm", { locale: es }) : "Sin fecha límite"}{overdue && " · Vencida"}</p>
           <p className="flex items-center gap-2"><UserRound size={18} /> {task.responsible?.full_name ?? "Responsable asignado"}</p>
         </div>
         <TaskTimingInfo task={task} detailed />
@@ -235,17 +235,17 @@ export function TaskPreviewDialog({
         {!detail ? <p className="py-8 text-center text-sm text-[var(--ink-soft)]">Cargando actividad...</p> : tab === "comments" ? (
           <div className="mt-4">
             <div className="max-h-64 space-y-3 overflow-y-auto">
-              {detail.comments.length === 0 ? <p className="rounded-md bg-[var(--paper)] p-4 text-sm text-[var(--ink-soft)]">TodavÃ­a no hay comentarios.</p> : detail.comments.map((item) => (
+              {detail.comments.length === 0 ? <p className="rounded-md bg-[var(--paper)] p-4 text-sm text-[var(--ink-soft)]">Todavía no hay comentarios.</p> : detail.comments.map((item) => (
                 <article key={item.id} className="rounded-md bg-[var(--paper)] p-4"><div className="flex justify-between gap-3"><p className="text-sm font-bold">{item.user?.full_name ?? "Usuario"}</p><time className="folio">{new Date(item.created_at).toLocaleString("es-EC")}</time></div><p className="mt-2 whitespace-pre-wrap text-sm text-[var(--ink-soft)]">{item.comment}</p></article>
               ))}
             </div>
-            {detail.capabilities.canComment && <div className="mt-4 flex gap-2"><textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={2} placeholder="Escribe un comentarioâ€¦" className="input min-w-0 flex-1 resize-none !py-2.5" /><button disabled={busy || !comment.trim()} onClick={() => void addComment()} className="btn btn-primary self-end !p-3" aria-label="Publicar comentario"><Send size={19} /></button></div>}
+            {detail.capabilities.canComment && <div className="mt-4 flex gap-2"><textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={2} placeholder="Escribe un comentario…" className="input min-w-0 flex-1 resize-none !py-2.5" /><button disabled={busy || !comment.trim()} onClick={() => void addComment()} className="btn btn-primary self-end !p-3" aria-label="Publicar comentario"><Send size={19} /></button></div>}
           </div>
         ) : tab === "history" ? (
           <div className="mt-4 max-h-72 space-y-3 overflow-y-auto">
             {detail.history.length === 0 && detail.requests.length === 0 ? <p className="rounded-md bg-[var(--paper)] p-4 text-sm text-[var(--ink-soft)]">No hay cambios registrados.</p> : <>
-              {detail.requests.map((request) => <article key={request.id} className="rounded-md border border-[var(--line)] p-4 text-sm"><div className="flex flex-wrap justify-between gap-2"><p><strong>{request.requester?.full_name ?? "Colaborador/a"}</strong> solicitÃ³ {statusLabels[request.requested_status].toLowerCase()}.</p><span className="stamp stamp-neutral">{requestLabels[request.review_status]}</span></div>{request.manager_comment && <p className="mt-2 text-[var(--ink-soft)]">Comentario: {request.manager_comment}</p>}<time className="folio mt-2 block">{new Date(request.created_at).toLocaleString("es-EC")}</time></article>)}
-              {detail.history.map((item) => <article key={item.id} className="rounded-md border border-[var(--line)] p-4 text-sm"><p><strong>{item.user?.full_name ?? "Gestor/a"}</strong> cambiÃ³ el estado de {statusLabels[item.old_status].toLowerCase()} a <strong>{statusLabels[item.new_status].toLowerCase()}</strong>.</p><time className="folio mt-2 block">{new Date(item.created_at).toLocaleString("es-EC")}</time></article>)}
+              {detail.requests.map((request) => <article key={request.id} className="rounded-md border border-[var(--line)] p-4 text-sm"><div className="flex flex-wrap justify-between gap-2"><p><strong>{request.requester?.full_name ?? "Colaborador/a"}</strong> solicitó {statusLabels[request.requested_status].toLowerCase()}.</p><span className="stamp stamp-neutral">{requestLabels[request.review_status]}</span></div>{request.manager_comment && <p className="mt-2 text-[var(--ink-soft)]">Comentario: {request.manager_comment}</p>}<time className="folio mt-2 block">{new Date(request.created_at).toLocaleString("es-EC")}</time></article>)}
+              {detail.history.map((item) => <article key={item.id} className="rounded-md border border-[var(--line)] p-4 text-sm"><p><strong>{item.user?.full_name ?? "Gestor/a"}</strong> cambió el estado de {statusLabels[item.old_status].toLowerCase()} a <strong>{statusLabels[item.new_status].toLowerCase()}</strong>.</p><time className="folio mt-2 block">{new Date(item.created_at).toLocaleString("es-EC")}</time></article>)}
             </>}
           </div>
         ) : (
@@ -266,7 +266,7 @@ export function TaskPreviewDialog({
                 </button>
               </div>
             )}
-            {detail.capabilities.canUpload && <div className="mb-4 rounded-md border border-dashed border-[var(--line-strong)] bg-[var(--paper)] p-4"><label className={`inline-flex items-center gap-2 rounded-md px-4 py-2.5 font-bold ${detail.capabilities.driveConfigured ? "bg-[var(--primary)] text-white" : "cursor-not-allowed bg-[var(--paper-deep)] text-[var(--line-strong)]"}`}><Upload size={18} /> Subir archivo<input type="file" className="hidden" disabled={!detail.capabilities.driveConfigured || busy} accept=".pdf,.png,.jpg,.jpeg,.txt,.docx" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); event.target.value = ""; }} /></label><p className="mt-2 text-xs text-[var(--ink-soft)]">{role === "collaborator" ? "Tu archivo quedarÃ¡ pendiente hasta que un/a gestor/a lo apruebe." : "Los archivos subidos por gestores/as quedan aprobados automÃ¡ticamente."}</p>{!detail.capabilities.driveConfigured && <p className="mt-2 text-xs font-semibold text-[#9A7B24]">El/la gestor/a debe conectar Google Drive y configurar una carpeta raÃ­z desde su perfil.</p>}</div>}
+            {detail.capabilities.canUpload && <div className="mb-4 rounded-md border border-dashed border-[var(--line-strong)] bg-[var(--paper)] p-4"><label className={`inline-flex items-center gap-2 rounded-md px-4 py-2.5 font-bold ${detail.capabilities.driveConfigured ? "bg-[var(--primary)] text-white" : "cursor-not-allowed bg-[var(--paper-deep)] text-[var(--line-strong)]"}`}><Upload size={18} /> Subir archivo<input type="file" className="hidden" disabled={!detail.capabilities.driveConfigured || busy} accept=".pdf,.png,.jpg,.jpeg,.txt,.docx" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); event.target.value = ""; }} /></label><p className="mt-2 text-xs text-[var(--ink-soft)]">{role === "collaborator" ? "Tu archivo quedará pendiente hasta que un/a gestor/a lo apruebe." : "Los archivos subidos por gestores/as quedan aprobados automáticamente."}</p>{!detail.capabilities.driveConfigured && <p className="mt-2 text-xs font-semibold text-[#9A7B24]">El/la gestor/a debe conectar Google Drive y configurar una carpeta raíz desde su perfil.</p>}</div>}
             {reviewFile && <div className={`mb-4 rounded-md border p-4 ${reviewFile.decision === "approved" ? "border-[#4A7058] bg-[#E9EFEA]" : "border-[var(--stamp-red)] bg-[var(--stamp-red-wash)]"}`}><p className="text-sm font-bold">{reviewFile.decision === "approved" ? "Aprobar" : "Rechazar"} â€œ{reviewFile.name}â€</p>{reviewFile.decision === "approved" && <div className="mt-3 rounded-md border border-[#4A7058] bg-[var(--surface)] p-3"><p className="text-sm font-bold">Guardar en Drive</p><p className="mt-1 text-xs text-[var(--ink-soft)]">{destinationFolderName ? `Seleccionado: ${destinationFolderName}` : "Si no eliges carpeta, se guardara en la carpeta principal de la tarea."}</p><button type="button" disabled={openingPicker || busy} onClick={() => void openDrivePicker()} className="btn btn-ghost mt-3 !px-3 !py-2 text-xs !text-[#4A7058]"><FolderOpen size={15} />{openingPicker ? "Abriendo Google..." : "Elegir carpeta"}</button></div>}<textarea value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} rows={2} placeholder="Comentario opcional para el pasante" className="input mt-3 resize-none !py-2 text-sm" /><div className="mt-3 flex justify-end gap-2"><button onClick={() => { setReviewFile(null); setReviewComment(""); setDestinationFolder(""); setDestinationFolderName(""); }} className="btn btn-ghost !px-3 !py-2 text-sm">Cancelar</button><button disabled={busy} onClick={() => void reviewUploadedFile()} className={`btn !px-3 !py-2 text-sm text-white ${reviewFile.decision === "approved" ? "!bg-[#4A7058] hover:!bg-[#3a5946]" : "btn-danger"}`}>Confirmar</button></div></div>}
             <div className="space-y-3">{detail.files.length === 0 ? <p className="rounded-md bg-[var(--paper)] p-4 text-sm text-[var(--ink-soft)]">No hay archivos adjuntos.</p> : detail.files.map((file) => {
               const canRemove = detail.capabilities.canReviewFiles || file.uploaded_by === detail.capabilities.currentUserId;
@@ -274,12 +274,12 @@ export function TaskPreviewDialog({
                 <div className="flex items-center gap-2">
                   <a href={file.drive_web_url} target="_blank" rel="noreferrer" className="flex min-w-0 flex-1 items-center gap-3">
                     <span className="rounded-md bg-[var(--primary-wash)] p-2 text-[var(--primary)]"><FileText size={20} /></span>
-                    <div className="min-w-0"><p className="truncate text-sm font-bold">{file.file_name}</p><p className="folio">{formatBytes(file.file_size)} Â· {file.uploader?.full_name ?? "Usuario"}</p></div>
+                    <div className="min-w-0"><p className="truncate text-sm font-bold">{file.file_name}</p><p className="folio">{formatBytes(file.file_size)} · {file.uploader?.full_name ?? "Usuario"}</p></div>
                   </a>
                   <FileStatus status={file.approval_status} />
                   {canRemove && <button disabled={busy} onClick={() => void removeFile(file.id)} className="rounded-md p-2 text-[var(--stamp-red)] hover:bg-[var(--stamp-red-wash)]" aria-label={`Eliminar ${file.file_name}`}><Trash2 size={17} /></button>}
                 </div>
-                {file.review_comment && <p className="mt-2 rounded-md bg-[var(--paper)] px-3 py-2 text-xs text-[var(--ink-soft)]">Comentario de revisiÃ³n: {file.review_comment}</p>}
+                {file.review_comment && <p className="mt-2 rounded-md bg-[var(--paper)] px-3 py-2 text-xs text-[var(--ink-soft)]">Comentario de revisión: {file.review_comment}</p>}
                 {detail.capabilities.canReviewFiles && file.approval_status === "pending" && <div className="mt-3 flex justify-end gap-2 border-t border-[var(--line)] pt-3"><button onClick={() => { setReviewFile({ id: file.id, name: file.file_name, decision: "rejected" }); setReviewComment(""); setDestinationFolder(""); setDestinationFolderName(""); }} className="flex items-center gap-1 rounded-md border border-[var(--stamp-red)] px-3 py-2 text-xs font-bold text-[var(--stamp-red)] hover:bg-[var(--stamp-red-wash)]"><X size={15} /> Rechazar</button><button onClick={() => { setReviewFile({ id: file.id, name: file.file_name, decision: "approved" }); setReviewComment(""); setDestinationFolder(""); setDestinationFolderName(""); }} className="flex items-center gap-1 rounded-md bg-[#4A7058] px-3 py-2 text-xs font-bold text-white hover:bg-[#3a5946]"><Check size={15} /> Aprobar</button></div>}
               </article>;
             })}</div>
@@ -301,7 +301,7 @@ function Tab({ active, onClick, icon: Icon, label }: { active: boolean; onClick:
 }
 
 function formatBytes(value?: number | null) {
-  if (!value) return "TamaÃ±o no disponible";
+  if (!value) return "Tamaño no disponible";
   if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import { BellRing, CalendarClock, ChevronLeft, ChevronRight, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
@@ -228,7 +228,7 @@ export function ManagerTaskBoard() {
   return (
     <section>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><h1 className="font-display text-3xl font-bold">Tareas</h1></div>
+        <div><h1 className="font-display text-2xl font-bold sm:text-3xl">Tareas</h1></div>
       </div>
 
       <TaskFilters

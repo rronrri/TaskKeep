@@ -147,7 +147,7 @@ export function TaskCalendar() {
   return (
     <section>
       <p className="folio !text-[var(--primary)]">PLANIFICACIÓN</p>
-      <h1 className="font-display text-3xl font-bold">Calendario</h1>
+      <h1 className="font-display text-2xl font-bold sm:text-3xl">Calendario</h1>
       <p className="mt-2 text-[var(--ink-soft)]">Selecciona un día para previsualizar sus tareas o pulsa un evento para abrirlo.</p>
       <ToastMessages success={notice} error={serverError} onClearSuccess={() => setNotice("")} onClearError={() => setServerError("")} />
 

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Folder, Inbox } from "lucide-react";
 import type { Task, TaskFolder } from "@/types";

@@ -127,7 +127,7 @@ export function PeopleManager({ mode }: { mode: "admin" | "manager" }) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="folio !text-[var(--primary)]">EQUIPO</p>
-          <h1 className="font-display text-3xl font-bold">{mode === "admin" ? "Personas" : "Colaboradores/as"}</h1>
+          <h1 className="font-display text-2xl font-bold sm:text-3xl">{mode === "admin" ? "Personas" : "Colaboradores/as"}</h1>
           <p className="mt-2 text-[var(--ink-soft)]">{mode === "admin" ? "Crea gestores/as y colaboradores/as, y asígnalos/as a una empresa." : "Crea y administra colaboradores/as de tu empresa."}</p>
         </div>
         <button onClick={openCreate} className="btn btn-primary !py-3"><Plus size={19} /> Nueva cuenta</button>

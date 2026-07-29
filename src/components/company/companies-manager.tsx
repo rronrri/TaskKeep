@@ -104,7 +104,7 @@ export function CompaniesManager() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="folio !text-[var(--primary)]">ORGANIZACIONES</p>
-          <h1 className="font-display text-3xl font-bold">Empresas</h1>
+          <h1 className="font-display text-2xl font-bold sm:text-3xl">Empresas</h1>
           <p className="mt-2 text-[var(--ink-soft)]">Configura empresas y sus límites de usuarios.</p>
         </div>
         <button onClick={openCreate} className="btn btn-primary !py-3">
@@ -153,7 +153,7 @@ export function CompaniesManager() {
         <form onSubmit={handleSubmit(submit)} className="space-y-4" noValidate>
           <Field label="Nombre" error={errors.name?.message}><input {...register("name")} className="input !py-2.5" /></Field>
           <Field label="Descripción" error={errors.description?.message}><textarea {...register("description")} rows={3} className="input resize-y !py-2.5" /></Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Máx. gestores/as" error={errors.max_managers?.message}><input type="number" min={1} max={100} {...register("max_managers", { valueAsNumber: true })} className="input !py-2.5" /></Field>
             <Field label="Máx. colaboradores/as" error={errors.max_collaborators?.message}><input type="number" min={1} max={10000} {...register("max_collaborators", { valueAsNumber: true })} className="input !py-2.5" /></Field>
           </div>

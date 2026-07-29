@@ -176,7 +176,7 @@ export function ProfileManager() {
   return (
     <section className="mx-auto max-w-3xl">
       <p className="folio !text-[var(--primary)]">MI CUENTA</p>
-      <h1 className="font-display text-3xl font-bold">{forcedChange ? "Cambia tu contrasena temporal" : "Perfil"}</h1>
+      <h1 className="font-display text-2xl font-bold sm:text-3xl">{forcedChange ? "Cambia tu contrasena temporal" : "Perfil"}</h1>
       <p className="mt-2 text-[var(--ink-soft)]">
         {forcedChange ? "Debes establecer una contrasena personal antes de usar el sistema." : "Administra tus datos, tu acceso y Google Drive desde modales separados."}
       </p>

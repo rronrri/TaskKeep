@@ -178,6 +178,37 @@ button:disabled { cursor: not-allowed; }
 .fc .fc-button { border-radius: 6px; font-weight: 600; text-transform: none; }
 .fc .fc-daygrid-day-number, .fc .fc-col-header-cell-cushion { color: var(--ink); font-variant-numeric: tabular-nums; }
 
+/* ── Adaptación a pantallas pequeñas ── */
+@media (max-width: 640px) {
+  /* Safari en iOS hace zoom sobre la página al enfocar un campo cuyo texto mide
+     menos de 16px. Varias pantallas usan `.input text-sm` (14px), así que se fija
+     el tamaño mínimo aquí en lugar de revisar cada campo. */
+  .input,
+  input.input,
+  select.input,
+  textarea.input { font-size: 16px; }
+
+  /* El calendario mensual reparte 7 columnas: en móvil hay que apretar los
+     espaciados o las celdas se desbordan. */
+  .fc { font-size: 12px; }
+  .fc .fc-daygrid-day-frame { min-height: 4.25rem; }
+  .fc .fc-daygrid-day-number { padding: 2px 4px; }
+  .fc .fc-col-header-cell-cushion { padding: 5px 2px; font-size: 11px; }
+  .fc .fc-daygrid-event { padding: 0 3px; font-size: 11px; }
+  .fc .fc-daygrid-event .fc-event-title { overflow: hidden; text-overflow: ellipsis; }
+  /* La hora ocupa casi todo el ancho de una celda de móvil y deja el título
+     ilegible. El detalle está a un toque de distancia, en la ficha del día. */
+  .fc .fc-daygrid-event .fc-event-time { display: none; }
+  .fc .fc-daygrid-more-link { font-size: 11px; }
+}
+
+/* En pantallas táctiles los botones de solo icono quedaban por debajo del área
+   mínima recomendada (44px), difíciles de acertar con el dedo. */
+@media (pointer: coarse) {
+  .btn { min-height: 44px; }
+  button[aria-label] { min-height: 44px; min-width: 44px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   .btn:not(:disabled):active { transform: none; }

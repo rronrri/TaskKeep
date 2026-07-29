@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef } from "react";
 import { CheckCircle2, CircleAlert, X } from "lucide-react";
