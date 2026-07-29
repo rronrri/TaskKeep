@@ -2,8 +2,20 @@ import { jwtVerify, SignJWT } from "jose";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/server";
 
+// `drive.file` en lugar de `drive`: da acceso únicamente a los archivos y carpetas
+// que la aplicación crea y a los que la persona elige explícitamente en Google
+// Picker, no a toda su cuenta de Drive.
+//
+// Es lo que TaskKeep necesita y, además, Google lo clasifica como alcance no
+// sensible: no exige verificación de la app ni evaluación de seguridad anual, y
+// los tokens no caducan a los 7 días como ocurre con las apps en modo prueba que
+// piden alcances restringidos.
+//
+// Consecuencia de diseño: la carpeta raíz de la empresa debe seleccionarse con el
+// Picker (así queda autorizada). Pegar un enlace ya no basta, porque la app no
+// tendría permiso sobre esa carpeta.
 const scopes = [
-  "https://www.googleapis.com/auth/drive",
+  "https://www.googleapis.com/auth/drive.file",
   "https://www.googleapis.com/auth/userinfo.email",
   "openid",
 ];

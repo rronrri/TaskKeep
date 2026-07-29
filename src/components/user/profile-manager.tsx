@@ -34,14 +34,15 @@ export function ProfileManager() {
   const [driveModalOpen, setDriveModalOpen] = useState(false);
   const [driveSuccessOpen, setDriveSuccessOpen] = useState(false);
   const [driveLink, setDriveLink] = useState("");
+  const [driveFolderId, setDriveFolderId] = useState("");
   const [driveFolderName, setDriveFolderName] = useState("");
   const [driveError, setDriveError] = useState("");
   const [savingDrive, setSavingDrive] = useState(false);
   const [openingPicker, setOpeningPicker] = useState(false);
 
-  const { register, handleSubmit, reset, setError, getValues, formState: { errors, isSubmitting } } = useForm<ProfileInput>({
+  const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } = useForm<ProfileInput>({
     resolver: zodResolver(profileSchema),
-    defaultValues: { full_name: "", email: "", current_password: "", new_password: "", drive_folder_url: "" },
+    defaultValues: { full_name: "", email: "", current_password: "", new_password: "" },
   });
 
   useEffect(() => {
@@ -50,8 +51,9 @@ export function ProfileManager() {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? "No se pudo cargar el perfil");
         const company = currentCompany(body.data.company);
-        reset({ full_name: body.data.full_name, email: body.data.email, current_password: "", new_password: "", drive_folder_url: company?.drive_folder_url ?? "" });
+        reset({ full_name: body.data.full_name, email: body.data.email, current_password: "", new_password: "" });
         setDriveLink(company?.drive_folder_url ?? "");
+        setDriveFolderId(company?.drive_folder_id ?? "");
         setMeta(body.data);
         if (body.data.must_change_password) setAccountModalOpen(true);
         const params = new URLSearchParams(window.location.search);
@@ -81,7 +83,7 @@ export function ProfileManager() {
     const response = await fetch("/api/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...values, drive_folder_url: undefined }),
+      body: JSON.stringify(values),
     });
     const body = await response.json();
     if (!response.ok) {
@@ -90,8 +92,7 @@ export function ProfileManager() {
     }
 
     const wasTemporary = meta?.must_change_password;
-    const company = currentCompany(body.data.company);
-    reset({ full_name: body.data.full_name, email: body.data.email, current_password: "", new_password: "", drive_folder_url: company?.drive_folder_url ?? driveLink });
+    reset({ full_name: body.data.full_name, email: body.data.email, current_password: "", new_password: "" });
     setConfirmation("");
     setMeta(body.data);
     setAccountModalOpen(false);
@@ -106,7 +107,7 @@ export function ProfileManager() {
 
   const saveDriveFolder = async () => {
     setDriveError("");
-    if (!driveLink) {
+    if (!driveFolderId) {
       setDriveError("Elige una carpeta de Google Drive antes de guardar.");
       return;
     }
@@ -114,7 +115,7 @@ export function ProfileManager() {
     const response = await fetch("/api/profile/drive", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ drive_folder_url: driveLink }),
+      body: JSON.stringify({ drive_folder_id: driveFolderId, drive_folder_url: driveLink || undefined }),
     });
     const body = await response.json();
     setSavingDrive(false);
@@ -123,7 +124,6 @@ export function ProfileManager() {
       return;
     }
     setMeta((current) => current ? { ...current, company: body.data } : current);
-    reset({ ...getValues(), drive_folder_url: body.data?.drive_folder_url ?? driveLink });
     setDriveModalOpen(false);
     setDriveSuccessOpen(true);
   };
@@ -154,6 +154,9 @@ export function ProfileManager() {
           if (data.action !== window.google.picker.Action.PICKED) return;
           const folder = data.docs?.[0];
           if (folder?.id) {
+            // Elegir la carpeta con el Picker es lo que la autoriza para la app
+            // bajo el alcance `drive.file`; por eso se envía su identificador.
+            setDriveFolderId(folder.id);
             setDriveLink(folder.url || `https://drive.google.com/drive/folders/${folder.id}`);
             setDriveFolderName(folder.name ?? "Carpeta seleccionada");
           }
@@ -274,7 +277,7 @@ export function ProfileManager() {
           {driveError && <p role="alert" className="rounded-md bg-[var(--stamp-red-wash)] p-3 text-sm font-semibold text-[var(--stamp-red)]">{driveError}</p>}
           <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-4">
             <p className="folio uppercase">Carpeta seleccionada</p>
-            <p className="mt-1 text-sm font-semibold text-[var(--ink)]">{driveFolderName || (driveLink ? "Carpeta actual configurada" : "Todavia no has elegido una carpeta")}</p>
+            <p className="mt-1 text-sm font-semibold text-[var(--ink)]">{driveFolderName || (driveFolderId ? "Carpeta actual configurada" : "Todavia no has elegido una carpeta")}</p>
           </div>
           <button type="button" disabled={openingPicker} onClick={() => void openGooglePicker()} className="btn btn-ghost !px-4 !py-2.5 text-sm !text-[var(--primary)]">
             <FolderOpen size={17} />
@@ -282,7 +285,7 @@ export function ProfileManager() {
           </button>
           <div className="flex justify-end gap-3">
             <button type="button" onClick={() => setDriveModalOpen(false)} className="btn btn-ghost !py-2">Cancelar</button>
-            <button type="button" disabled={savingDrive || !driveLink} onClick={() => void saveDriveFolder()} className="btn btn-primary !px-5 !py-2">{savingDrive ? "Guardando..." : "Guardar carpeta"}</button>
+            <button type="button" disabled={savingDrive || !driveFolderId} onClick={() => void saveDriveFolder()} className="btn btn-primary !px-5 !py-2">{savingDrive ? "Guardando..." : "Guardar carpeta"}</button>
           </div>
         </div>
       </AppDialog>

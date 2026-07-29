@@ -109,5 +109,4 @@ export const profileSchema = z.object({
   email: z.string().email("Ingresa un correo válido").max(254),
   current_password: z.string().max(128),
   new_password: z.union([z.string().min(8, "Usa al menos 8 caracteres").max(128), z.literal("")]),
-  drive_folder_url: z.union([z.string().url("Ingresa un enlace válido de Google Drive"), z.literal("")]).optional(),
 });

@@ -6,6 +6,30 @@ Este documento resume lo necesario para configurar o cambiar la cuenta/proyecto 
 
 TaskKeep usa OAuth de Google para que cada gestor/a conecte su propia cuenta y configure una carpeta raíz de Drive para su empresa. Los colaboradores/as no conectan Google: heredan la carpeta configurada por el/la gestor/a.
 
+Hay **un solo proyecto de Google Cloud y un solo cliente OAuth** para toda la
+aplicación: identifican a TaskKeep, no a las personas. Cada gestor/a autoriza
+después su propia cuenta de Google desde su perfil.
+
+### Alcance solicitado
+
+TaskKeep pide `https://www.googleapis.com/auth/drive.file` (más `userinfo.email`
+y `openid`). Es una decisión deliberada, no un detalle:
+
+- `drive.file` da acceso **solo** a lo que la aplicación crea y a lo que la
+  persona elige explícitamente en Google Picker. No al resto de su Drive.
+- Google lo clasifica como alcance **no sensible**: la app se puede publicar sin
+  proceso de verificación ni evaluación de seguridad anual por un tercero.
+- El alcance amplio `auth/drive` es **restringido**: obliga a verificación y a una
+  evaluación de seguridad externa para salir de modo prueba, y mientras la app
+  está en pruebas los refresh tokens caducan a los 7 días, obligando a reconectar
+  cada semana.
+
+Consecuencia práctica: **la carpeta raíz se elige con el selector de Google, no
+pegando un enlace.** Elegirla en el Picker es justamente lo que la autoriza para
+la aplicación. Del mismo modo, TaskKeep solo ve las subcarpetas que creó ella
+misma: una subcarpeta creada a mano desde Drive dentro de la carpeta de una tarea
+no aparecerá en el explorador de la aplicación.
+
 Variables necesarias:
 
 ```env
@@ -15,7 +39,8 @@ NEXT_PUBLIC_GOOGLE_API_KEY="..."
 NEXT_PUBLIC_GOOGLE_APP_ID="..."
 ```
 
-Variables actuales de referencia:
+Valores del proyecto anterior, solo como referencia de formato (si creas un
+proyecto nuevo hay que reemplazarlos y **cada gestor/a deberá reconectar**):
 
 ```env
 GOOGLE_OAUTH_CLIENT_ID="1049985464679-01990l583vjj449mc9t5qev8l229v7nb.apps.googleusercontent.com"
@@ -44,8 +69,23 @@ En Google Cloud Console, dentro del proyecto de TaskKeep:
    - Nombre de app: `TaskKeep`
    - Correo de soporte
    - Correos de contacto
-   - Tipo externo si se usará con cuentas fuera de la organización
-8. Si la app está en modo testing, agregar los correos de prueba.
+   - Tipo **Externo** si se usará con cuentas fuera de la organización
+8. En **Alcances (scopes)**, agregar únicamente:
+
+```text
+https://www.googleapis.com/auth/drive.file
+https://www.googleapis.com/auth/userinfo.email
+openid
+```
+
+   No agregar `https://www.googleapis.com/auth/drive`: es un alcance restringido y
+   obliga a verificación con evaluación de seguridad externa.
+
+9. Mientras la app esté en **modo prueba**, agregar como usuarios de prueba los
+   correos de Google de cada gestor/a que vaya a conectar su Drive (tope de 100).
+10. Con solo alcances no sensibles, se puede **publicar** la app (botón *Publicar
+    aplicación*) sin pasar por verificación. Al publicarla desaparecen el límite
+    de usuarios de prueba y la caducidad temprana de los tokens.
 
 ## Crear OAuth Client
 
@@ -116,9 +156,12 @@ NEXT_PUBLIC_GOOGLE_APP_ID="1049985464679"
 1. El/la gestor/a inicia sesión.
 2. Si la contraseña es temporal, TaskKeep obliga a cambiarla.
 3. Desde **Mi perfil**, el/la gestor/a pulsa **Conectar Google**.
-4. Google pide autorización.
-5. Luego el/la gestor/a pega el enlace de una carpeta raíz de Drive.
-6. TaskKeep valida la carpeta y la guarda para la empresa.
+4. Google pide autorización. TaskKeep guarda el refresh token cifrado (AES-256-GCM)
+   asociado a esa persona.
+5. El/la gestor/a pulsa **Elegir carpeta** y selecciona la carpeta raíz con el
+   selector de Google. Esa selección es la que autoriza la carpeta para la app.
+6. TaskKeep comprueba el acceso y la guarda como carpeta de la empresa
+   (`drive_folder_id` y `drive_owner_user_id`).
 7. Cada tarea usa una carpeta propia:
 
 ```text
@@ -144,7 +187,28 @@ NEXT_PUBLIC_GOOGLE_APP_ID="nuevo-app-id"
 
 3. Reiniciar la aplicación.
 4. Cada gestor/a debe volver a pulsar **Reconectar Google** desde su perfil.
-5. Si se cambia también la carpeta raíz, pegar el nuevo enlace y guardar.
+5. Volver a elegir la carpeta raíz con el selector y guardar. Con `drive.file` la
+   autorización sobre la carpeta va ligada al cliente OAuth, así que un cliente
+   nuevo no hereda los permisos del anterior.
+
+## Si vienes de una versión con el alcance amplio
+
+Las empresas que configuraron su carpeta con el alcance `auth/drive` (pegando un
+enlace) dejarán de funcionar al cambiar a `drive.file`, porque la aplicación ya no
+tiene permiso sobre esa carpeta. Cada gestor/a debe:
+
+1. Entrar en **Mi perfil** y pulsar **Reconectar Google** (vuelve a pedir
+   consentimiento, ahora con el alcance nuevo).
+2. Pulsar **Elegir carpeta** y seleccionar la misma carpeta raíz de siempre.
+
+Los archivos ya subidos siguen en Drive y no se tocan, pero TaskKeep solo podrá
+operar sobre las carpetas y archivos que cree a partir de ese momento.
+
+## Nota sobre `JWT_SECRET`
+
+La clave que cifra los refresh tokens de Google se deriva de `JWT_SECRET`. Si se
+rota esa variable, **todas las conexiones de Google quedan inservibles** y cada
+gestor/a tiene que reconectar. Tenerlo en cuenta antes de rotarla.
 
 ## Producción
 

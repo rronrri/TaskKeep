@@ -5,8 +5,6 @@ import { createSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/server";
 import { profileSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
-import { parseDriveFolderLink } from "@/lib/google-drive/oauth";
-import { verifyDriveFolder } from "@/lib/google-drive";
 
 export async function GET() {
   const auth = await requireApiUser(undefined, { allowTemporaryPassword: true });
@@ -41,36 +39,10 @@ export async function PATCH(request: Request) {
         { status: 400 },
       );
     }
-    if (auth.user.role === "manager" && input.drive_folder_url !== undefined) {
-      if (!input.drive_folder_url) {
-        await supabase.from("companies").update({
-          drive_folder_id: null,
-          drive_folder_url: null,
-          drive_owner_user_id: null,
-          drive_connected_at: null,
-        }).eq("id", auth.user.companyId!);
-      } else {
-        const folderId = parseDriveFolderLink(input.drive_folder_url);
-        if (!folderId) {
-          return NextResponse.json({ error: "No se pudo reconocer el enlace de la carpeta de Google Drive" }, { status: 400 });
-        }
-        try {
-          await verifyDriveFolder(folderId, auth.user.id);
-        } catch (error) {
-          const detail = error instanceof Error ? error.message : "No se pudo validar la carpeta de Google Drive";
-          return NextResponse.json(
-            { error: detail.includes("File not found") ? "Google no encuentra esa carpeta con la cuenta conectada. Verifica que conectaste la cuenta dueña de la carpeta o que la carpeta esté compartida con esa cuenta." : detail },
-            { status: 400 },
-          );
-        }
-        await supabase.from("companies").update({
-          drive_folder_id: folderId,
-          drive_folder_url: input.drive_folder_url,
-          drive_owner_user_id: auth.user.id,
-          drive_connected_at: new Date().toISOString(),
-        }).eq("id", auth.user.companyId!);
-      }
-    }
+    // La carpeta de Drive se administra en PATCH /api/profile/drive. Antes también
+    // se escribía aquí, y se hacía ANTES de validar la contraseña actual: una
+    // petición que terminaba en error ya había cambiado (o borrado) la carpeta de
+    // la empresa.
     if (input.new_password) {
       if (!input.current_password || !(await bcrypt.compare(input.current_password, current.password_hash))) {
         return NextResponse.json({ error: "La contraseña actual no es correcta" }, { status: 400 });
