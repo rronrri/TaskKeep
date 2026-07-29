@@ -45,11 +45,52 @@ export async function PATCH(request: Request) {
   try {
     const input = restoreFolderSchema.parse(await request.json());
     const supabase = createAdminClient();
+
+    // El upsert va con identificadores enviados por el cliente. Sin comprobarlos,
+    // un identificador de otra empresa se sobrescribiría con nuestro company_id,
+    // moviendo esa carpeta ajena a la empresa de quien llama.
+    const incomingIds = input.folders.map((folder) => folder.id);
+    if (incomingIds.length > 0) {
+      const { data: conflicting, error: conflictError } = await supabase
+        .from("task_folders")
+        .select("id,company_id,created_by")
+        .in("id", incomingIds);
+      if (conflictError) throw conflictError;
+      const foreign = (conflicting ?? []).find((row) => row.company_id !== auth.user.companyId);
+      if (foreign) {
+        return NextResponse.json({ error: "Carpeta no encontrada" }, { status: 404 });
+      }
+      if (auth.user.role === "collaborator") {
+        const notOwned = (conflicting ?? []).find((row) => row.created_by !== auth.user.id);
+        if (notOwned) {
+          return NextResponse.json({ error: "Solo puedes restaurar carpetas creadas por ti" }, { status: 403 });
+        }
+      }
+    }
+
+    // Un/a colaborador/a solo restaura sus propias tareas.
+    if (auth.user.role === "collaborator" && input.tasks.length > 0) {
+      const { data: taskRows, error: taskError } = await supabase
+        .from("tasks")
+        .select("id,created_by,responsible_id")
+        .eq("company_id", auth.user.companyId!)
+        .in("id", input.tasks.map((task) => task.id));
+      if (taskError) throw taskError;
+      const restorable = new Set(
+        (taskRows ?? [])
+          .filter((row) => row.created_by === auth.user.id && row.responsible_id === auth.user.id)
+          .map((row) => row.id),
+      );
+      if (restorable.size !== input.tasks.length) {
+        return NextResponse.json({ error: "Solo puedes restaurar tareas creadas por ti" }, { status: 403 });
+      }
+    }
+
     const folders = input.folders.map((folder) => ({
       id: folder.id,
       company_id: auth.user.companyId,
       parent_id: folder.parent_id,
-      created_by: folder.created_by ?? auth.user.id,
+      created_by: auth.user.role === "collaborator" ? auth.user.id : folder.created_by ?? auth.user.id,
       name: folder.name,
       created_at: folder.created_at,
       updated_at: new Date().toISOString(),
@@ -80,9 +121,29 @@ export async function DELETE(request: Request) {
     if (!folder) return NextResponse.json({ error: "Carpeta no encontrada" }, { status: 404 });
 
     const folderIds = collectDescendantIds(allFolders ?? [], input.id);
-    const { data: taskRows, error: tasksError } = await supabase.from("tasks").select("id,folder_id").eq("company_id", auth.user.companyId!).in("folder_id", folderIds).is("deleted_at", null);
+    const { data: taskRows, error: tasksError } = await supabase.from("tasks").select("id,folder_id,created_by,responsible_id").eq("company_id", auth.user.companyId!).in("folder_id", folderIds).is("deleted_at", null);
     if (tasksError) throw tasksError;
-    const snapshot = { folders: (allFolders ?? []).filter((item) => folderIds.includes(item.id)), tasks: taskRows ?? [] };
+
+    // Eliminar una carpeta arrastra todas sus subcarpetas y archiva las tareas que
+    // contienen. Un/a colaborador/a solo puede hacerlo sobre lo que es suyo: sin
+    // esta comprobación podría archivar el trabajo de todo el equipo.
+    if (auth.user.role === "collaborator") {
+      const subtree = (allFolders ?? []).filter((item) => folderIds.includes(item.id));
+      if (subtree.some((item) => item.created_by !== auth.user.id)) {
+        return NextResponse.json({ error: "Solo puedes eliminar carpetas creadas por ti" }, { status: 403 });
+      }
+      if ((taskRows ?? []).some((row) => row.created_by !== auth.user.id || row.responsible_id !== auth.user.id)) {
+        return NextResponse.json(
+          { error: "La carpeta contiene tareas de otras personas. Muévelas antes de eliminarla." },
+          { status: 409 },
+        );
+      }
+    }
+
+    const snapshot = {
+      folders: (allFolders ?? []).filter((item) => folderIds.includes(item.id)),
+      tasks: (taskRows ?? []).map(({ id, folder_id }) => ({ id, folder_id })),
+    };
 
     if (taskRows?.length) {
       const { error } = await supabase.from("tasks").update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("company_id", auth.user.companyId!).in("folder_id", folderIds).is("deleted_at", null);

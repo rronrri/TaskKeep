@@ -250,7 +250,11 @@ export function TaskPreviewDialog({
           </div>
         ) : (
           <div className="mt-4">
-            {detail.capabilities.canUpload && detail.capabilities.driveConfigured && (
+            {/* El selector de carpetas usa un token de la cuenta de Google del/de
+                la gestor/a, así que solo se ofrece a quien conectó esa cuenta.
+                Los archivos de colaboradores/as van a "Pendientes" y es el/la
+                gestor/a quien elige el destino final al aprobarlos. */}
+            {role === "manager" && detail.capabilities.canUpload && detail.capabilities.driveConfigured && (
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--primary)] bg-[var(--primary-wash)] p-4">
                 <div>
                   <p className="text-sm font-bold text-[var(--ink)]">Destino en Google Drive</p>

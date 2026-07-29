@@ -7,7 +7,7 @@ import { protectMutation } from "@/lib/security";
 type Context = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, context: Context) {
-  const blocked = protectMutation(request, { scope: "status-request", limit: 15, windowMs: 10 * 60_000 });
+  const blocked = await protectMutation(request, { scope: "status-request", limit: 15, windowMs: 10 * 60_000 });
   if (blocked) return blocked;
   const auth = await requireApiUser(["collaborator"]);
   if (auth.error) return auth.error;

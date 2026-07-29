@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { apiError, requireApiUser } from "@/lib/api";
+import { apiError, requireApiUser, sanitizeSearch } from "@/lib/api";
 import { sendUserWelcomeEmail } from "@/lib/resend/send-user-welcome";
 import { createAdminClient } from "@/lib/supabase/server";
 import { userSchema } from "@/lib/validators";
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   if (url.searchParams.get("role")) query = query.eq("role", url.searchParams.get("role")!);
   if (url.searchParams.get("active") === "true") query = query.eq("is_active", true);
   if (url.searchParams.get("active") === "false") query = query.eq("is_active", false);
-  const search = url.searchParams.get("q")?.trim().replaceAll("%", "");
+  const search = sanitizeSearch(url.searchParams.get("q"));
   if (search) query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
   const companyId = url.searchParams.get("company_id");
   if (companyId && auth.user.role === "admin") query = query.eq("company_id", companyId);
@@ -86,18 +86,7 @@ export async function POST(request: Request) {
     await writeAudit({ actorId: auth.user.id, companyId: data.company_id, action: "user.created", entityType: "user", entityId: data.id, metadata: { role: data.role, email: data.email } });
     return NextResponse.json({ data, emailDelivery }, { status: 201 });
   } catch (error) {
-    if (isDuplicateEmailError(error)) {
-      return NextResponse.json(
-        { error: "Ya existe una cuenta con ese correo electrónico" },
-        { status: 409 },
-      );
-    }
+    // `apiError` ya traduce la colisión de email a un 409.
     return apiError(error);
   }
-}
-
-function isDuplicateEmailError(error: unknown) {
-  if (!error || typeof error !== "object") return false;
-  const databaseError = error as { code?: string; message?: string };
-  return databaseError.code === "23505" && databaseError.message?.includes("users_email_key");
 }

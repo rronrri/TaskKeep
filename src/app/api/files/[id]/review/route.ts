@@ -3,7 +3,7 @@ import { apiError, requireApiUser } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { createAdminClient } from "@/lib/supabase/server";
 import { fileReviewSchema } from "@/lib/validators";
-import { moveDriveFile } from "@/lib/google-drive";
+import { assertFolderInCompanyTree, moveDriveFile } from "@/lib/google-drive";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -32,6 +32,18 @@ export async function POST(request: Request, context: Context) {
       const destination = input.drive_folder_id || task.drive_folder_id;
       if (!destination || !company?.drive_owner_user_id) {
         return NextResponse.json({ error: "Configura Google Drive antes de aprobar el archivo" }, { status: 409 });
+      }
+      if (input.drive_folder_id) {
+        // Destino elegido por el cliente: debe caer dentro del árbol de la empresa.
+        const { data: companyRoot } = await supabase
+          .from("companies")
+          .select("drive_folder_id")
+          .eq("id", auth.user.companyId!)
+          .maybeSingle();
+        if (!companyRoot?.drive_folder_id) {
+          return NextResponse.json({ error: "Configura Google Drive antes de aprobar el archivo" }, { status: 409 });
+        }
+        await assertFolderInCompanyTree(destination, companyRoot.drive_folder_id, company.drive_owner_user_id);
       }
       const moved = await moveDriveFile(target.drive_file_id, target.drive_folder_id, destination, company.drive_owner_user_id);
       nextWebUrl = moved.webViewLink;

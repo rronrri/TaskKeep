@@ -9,7 +9,7 @@ import { protectMutation } from "@/lib/security";
 const schema = z.object({ token: z.string().min(32), password: z.string().min(8).max(128) });
 
 export async function POST(request: Request) {
-  const blocked = protectMutation(request, { scope: "reset-password", limit: 8, windowMs: 15 * 60_000 });
+  const blocked = await protectMutation(request, { scope: "reset-password", limit: 8, windowMs: 15 * 60_000 });
   if (blocked) return blocked;
   try {
     const input = schema.parse(await request.json());

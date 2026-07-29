@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
-import { createDriveFolder, listDriveFolders } from "@/lib/google-drive";
+import { assertFolderInCompanyTree, createDriveFolder, listDriveFolders } from "@/lib/google-drive";
 import { createAdminClient } from "@/lib/supabase/server";
 
 type Context = { params: Promise<{ id: string }> };
@@ -37,8 +37,13 @@ export async function GET(request: Request, context: Context) {
       throw error;
     }
     const url = new URL(request.url);
-    const parentId = url.searchParams.get("parent") || taskFolderId || company.drive_folder_id;
+    const requestedParent = url.searchParams.get("parent");
+    const parentId = requestedParent || taskFolderId || company.drive_folder_id;
     if (!parentId) return NextResponse.json({ error: "La tarea no tiene carpeta de Drive" }, { status: 409 });
+    if (requestedParent) {
+      // Solo se puede navegar dentro del árbol de la empresa.
+      await assertFolderInCompanyTree(requestedParent, company.drive_folder_id!, company.drive_owner_user_id);
+    }
     let folders: Array<{ id: string; name: string; webViewLink?: string }> = [];
     try {
       folders = await listDriveFolders(parentId, company.drive_owner_user_id);
@@ -91,6 +96,9 @@ export async function POST(request: Request, context: Context) {
         const folder = await createDriveFolder(taskFolderName(task.id, task.title), company.drive_folder_id, company.drive_owner_user_id);
         taskFolderId = folder.id;
         await supabase.from("tasks").update({ drive_folder_id: taskFolderId }).eq("id", task.id);
+      }
+      if (requestedParent) {
+        await assertFolderInCompanyTree(requestedParent, company.drive_folder_id, company.drive_owner_user_id);
       }
       const folder = await createDriveFolder(name, requestedParent || taskFolderId, company.drive_owner_user_id);
       return NextResponse.json({ data: folder }, { status: 201 });

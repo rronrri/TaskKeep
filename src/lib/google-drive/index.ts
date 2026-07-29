@@ -1,9 +1,67 @@
+import { DriveFolderNotAllowedError } from "./errors";
 import { getGoogleAccessToken, isGoogleOAuthConfigured } from "./oauth";
+
+export { DriveFolderNotAllowedError };
 
 const folderMime = "application/vnd.google-apps.folder";
 
+// Profundidad máxima al subir por la cadena de `parents` buscando la carpeta raíz
+// de la empresa. Evita bucles y peticiones sin fin ante jerarquías inesperadas.
+const MAX_TREE_DEPTH = 25;
+
 export function isDriveConfigured() {
   return isGoogleOAuthConfigured();
+}
+
+/**
+ * Los identificadores de Google Drive son cadenas seguras para URL. Validamos el
+ * formato antes de usarlos: impide inyectar sintaxis en las consultas `q` y
+ * descarta de entrada cualquier valor manipulado.
+ */
+export function isValidDriveId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{10,200}$/.test(value);
+}
+
+function requireDriveId(value: unknown, label = "carpeta") {
+  if (!isValidDriveId(value)) {
+    throw new DriveFolderNotAllowedError(`El identificador de ${label} de Google Drive no es válido`);
+  }
+  return value;
+}
+
+/**
+ * Comprueba que `folderId` sea la carpeta raíz de la empresa o una descendiente
+ * suya, subiendo por la cadena de `parents`.
+ *
+ * Es la única defensa contra que un identificador enviado por el cliente apunte a
+ * cualquier otra carpeta del Drive de la persona propietaria: todas las
+ * operaciones se ejecutan con su token, así que sin esta comprobación el alcance
+ * efectivo sería su cuenta entera. Debe llamarse ANTES de subir, mover, listar o
+ * crear sobre cualquier identificador de origen externo.
+ */
+export async function assertFolderInCompanyTree(folderId: string, companyRootId: string, ownerId: string) {
+  requireDriveId(folderId);
+  requireDriveId(companyRootId, "carpeta raíz");
+  if (folderId === companyRootId) return;
+
+  const visited = new Set<string>([folderId]);
+  let currentId = folderId;
+
+  for (let depth = 0; depth < MAX_TREE_DEPTH; depth += 1) {
+    const current = await driveFetch(
+      `files/${encodeURIComponent(currentId)}?fields=id,parents&supportsAllDrives=true`,
+      ownerId,
+    );
+    const parents = (current.parents ?? []) as string[];
+    if (parents.includes(companyRootId)) return;
+
+    const next = parents.find((parent) => isValidDriveId(parent) && !visited.has(parent));
+    if (!next) break;
+    visited.add(next);
+    currentId = next;
+  }
+
+  throw new DriveFolderNotAllowedError();
 }
 
 async function driveFetch(path: string, ownerId: string, init: RequestInit = {}) {
@@ -36,6 +94,9 @@ export async function createDriveFolder(name: string, parentId: string, ownerId:
 }
 
 export async function listDriveFolders(parentId: string, ownerId: string) {
+  // `parentId` se interpola en la consulta `q` de Drive: validar el formato evita
+  // que se inyecte sintaxis de búsqueda y se listen carpetas ajenas a la tarea.
+  requireDriveId(parentId);
   const query = encodeURIComponent(`'${parentId}' in parents and mimeType='${folderMime}' and trashed=false`);
   const result = await driveFetch(`files?q=${query}&fields=files(id,name,webViewLink)&orderBy=name&includeItemsFromAllDrives=true&supportsAllDrives=true`, ownerId);
   return (result.files ?? []) as Array<{ id: string; name: string; webViewLink?: string }>;

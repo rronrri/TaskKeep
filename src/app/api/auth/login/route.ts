@@ -4,13 +4,25 @@ import { createSession } from "@/lib/auth/session";
 import { apiError } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { loginSchema } from "@/lib/validators";
-import { protectMutation } from "@/lib/security";
+import { clearFailedLogins, isAccountLocked, protectMutation, registerFailedLogin } from "@/lib/security";
 
 export async function POST(request: Request) {
-  const blocked = protectMutation(request, { scope: "login", limit: 10, windowMs: 10 * 60_000 });
+  const blocked = await protectMutation(request, { scope: "login", limit: 10, windowMs: 10 * 60_000 });
   if (blocked) return blocked;
   try {
     const input = loginSchema.parse(await request.json());
+
+    // El bloqueo por cuenta es lo que frena el relleno de credenciales repartido
+    // entre muchas IPs, donde el límite por dirección no sirve de nada. El mensaje
+    // es el mismo que el de credenciales inválidas para no revelar qué cuentas
+    // existen.
+    if (await isAccountLocked(input.email)) {
+      return NextResponse.json(
+        { error: "Demasiados intentos fallidos. Intenta nuevamente en unos minutos." },
+        { status: 429 },
+      );
+    }
+
     const supabase = createAdminClient();
     const { data: user } = await supabase
       .from("users")
@@ -20,9 +32,11 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (!user?.is_active || !(await bcrypt.compare(input.password, user.password_hash))) {
+      await registerFailedLogin(input.email);
       return NextResponse.json({ error: "Credenciales inválidas" }, { status: 401 });
     }
 
+    await clearFailedLogins(user.id);
     await createSession({
       id: user.id,
       companyId: user.company_id,

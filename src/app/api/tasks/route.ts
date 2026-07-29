@@ -1,5 +1,5 @@
 import { after, NextResponse } from "next/server";
-import { apiError, requireApiUser } from "@/lib/api";
+import { apiError, requireApiUser, sanitizeSearch } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { taskSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
@@ -7,49 +7,69 @@ import { reminderFields } from "@/lib/tasks/reminders";
 import { syncTaskReminders } from "@/lib/tasks/schedule-reminders";
 import { createDriveFolder } from "@/lib/google-drive";
 
+// Los parámetros llegan de la URL, así que hay que tolerar cualquier cosa: sin
+// esto, `?page=abc` produce un NaN que revienta el rango, y una fecha inválida
+// hace que `toISOString()` lance y devuelva un 500 sin contexto.
+function positiveInt(value: string | null, fallback: number, max: number) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return Math.min(parsed, max);
+}
+
+/** Convierte `YYYY-MM-DD` en un instante; devuelve null si no es una fecha válida. */
+function boundaryDate(value: string | null, endOfDay: boolean) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const date = new Date(endOfDay ? `${value}T23:59:59.999Z` : `${value}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 export async function GET(request: Request) {
   const auth = await requireApiUser();
   if (auth.error) return auth.error;
-  const url = new URL(request.url);
-  const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
-  const size = Math.min(50, Math.max(1, Number(url.searchParams.get("size") ?? 20)));
-  const supabase = createAdminClient();
-  let query = supabase
-    .from("tasks")
-    .select("*, responsible:users!tasks_responsible_id_fkey(full_name,email)", { count: "exact" })
-    .is("deleted_at", null);
-  if (auth.user.role !== "admin") query = query.eq("company_id", auth.user.companyId!);
-  if (auth.user.role === "collaborator") query = query.eq("responsible_id", auth.user.id);
-  for (const key of ["status", "priority", "responsible_id"] as const) {
-    const value = url.searchParams.get(key);
-    if (value) query = query.eq(key, value);
+  try {
+    const url = new URL(request.url);
+    const page = positiveInt(url.searchParams.get("page"), 1, 100_000);
+    const size = positiveInt(url.searchParams.get("size"), 20, 50);
+    const supabase = createAdminClient();
+    let query = supabase
+      .from("tasks")
+      .select("*, responsible:users!tasks_responsible_id_fkey(full_name,email)", { count: "exact" })
+      .is("deleted_at", null);
+    if (auth.user.role !== "admin") query = query.eq("company_id", auth.user.companyId!);
+    if (auth.user.role === "collaborator") query = query.eq("responsible_id", auth.user.id);
+    for (const key of ["status", "priority", "responsible_id"] as const) {
+      const value = url.searchParams.get(key);
+      if (value) query = query.eq(key, value);
+    }
+    if (url.searchParams.get("pinned") === "true") query = query.eq("is_pinned", true);
+    const folderId = url.searchParams.get("folder_id");
+    if (folderId === "none") query = query.is("folder_id", null);
+    else if (folderId) query = query.eq("folder_id", folderId);
+    const search = sanitizeSearch(url.searchParams.get("q"));
+    if (search) query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+    const deadlineFrom = boundaryDate(url.searchParams.get("deadline_from"), false);
+    const deadlineTo = boundaryDate(url.searchParams.get("deadline_to"), true);
+    if (deadlineFrom) query = query.gte("deadline", deadlineFrom);
+    if (deadlineTo) query = query.lte("deadline", deadlineTo);
+    const sort = url.searchParams.get("sort") ?? "deadline_asc";
+    const sortOptions: Record<string, { column: string; ascending: boolean }> = {
+      newest: { column: "created_at", ascending: false },
+      oldest: { column: "created_at", ascending: true },
+      deadline_asc: { column: "deadline", ascending: true },
+      deadline_desc: { column: "deadline", ascending: false },
+      priority: { column: "priority", ascending: false },
+      status: { column: "status", ascending: true },
+    };
+    const ordering = sortOptions[sort] ?? sortOptions.deadline_asc;
+    const { data, count, error } = await query
+      .order("is_pinned", { ascending: false })
+      .order(ordering.column, { ascending: ordering.ascending, nullsFirst: false })
+      .range((page - 1) * size, page * size - 1);
+    if (error) return apiError(error);
+    return NextResponse.json({ data, pagination: { page, size, total: count ?? 0 } });
+  } catch (error) {
+    return apiError(error);
   }
-  if (url.searchParams.get("pinned") === "true") query = query.eq("is_pinned", true);
-  const folderId = url.searchParams.get("folder_id");
-  if (folderId === "none") query = query.is("folder_id", null);
-  else if (folderId) query = query.eq("folder_id", folderId);
-  const search = url.searchParams.get("q")?.trim();
-  if (search) query = query.or(`title.ilike.%${search.replaceAll("%", "")}%,description.ilike.%${search.replaceAll("%", "")}%`);
-  const deadlineFrom = url.searchParams.get("deadline_from");
-  const deadlineTo = url.searchParams.get("deadline_to");
-  if (deadlineFrom) query = query.gte("deadline", new Date(`${deadlineFrom}T00:00:00`).toISOString());
-  if (deadlineTo) query = query.lte("deadline", new Date(`${deadlineTo}T23:59:59.999`).toISOString());
-  const sort = url.searchParams.get("sort") ?? "deadline_asc";
-  const sortOptions: Record<string, { column: string; ascending: boolean }> = {
-    newest: { column: "created_at", ascending: false },
-    oldest: { column: "created_at", ascending: true },
-    deadline_asc: { column: "deadline", ascending: true },
-    deadline_desc: { column: "deadline", ascending: false },
-    priority: { column: "priority", ascending: false },
-    status: { column: "status", ascending: true },
-  };
-  const ordering = sortOptions[sort] ?? sortOptions.deadline_asc;
-  const { data, count, error } = await query
-    .order("is_pinned", { ascending: false })
-    .order(ordering.column, { ascending: ordering.ascending, nullsFirst: false })
-    .range((page - 1) * size, page * size - 1);
-  if (error) return apiError(error);
-  return NextResponse.json({ data, pagination: { page, size, total: count ?? 0 } });
 }
 
 export async function POST(request: Request) {

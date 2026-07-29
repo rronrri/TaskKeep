@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
-import { createDriveFolder, findOrCreateDriveFolder, uploadToDrive } from "@/lib/google-drive";
+import { assertFolderInCompanyTree, createDriveFolder, findOrCreateDriveFolder, uploadToDrive } from "@/lib/google-drive";
 import { createAdminClient } from "@/lib/supabase/server";
 import { protectMutation } from "@/lib/security";
 import { writeAudit } from "@/lib/audit";
@@ -8,7 +8,7 @@ import { writeAudit } from "@/lib/audit";
 const allowed = new Set(["application/pdf", "image/png", "image/jpeg", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
 
 export async function POST(request: Request) {
-  const blocked = protectMutation(request, { scope: "file-upload", limit: 20, windowMs: 10 * 60_000 });
+  const blocked = await protectMutation(request, { scope: "file-upload", limit: 20, windowMs: 10 * 60_000 });
   if (blocked) return blocked;
   const auth = await requireApiUser(["manager", "collaborator"]);
   if (auth.error) return auth.error;
@@ -40,6 +40,11 @@ export async function POST(request: Request) {
         const taskFolder = await createDriveFolder(taskFolderName(task.id, task.title), company.drive_folder_id, company.drive_owner_user_id);
         taskFolderId = taskFolder.id;
         await supabase.from("tasks").update({ drive_folder_id: taskFolderId }).eq("id", task.id);
+      }
+      if (selectedFolderId) {
+        // La carpeta la elige el cliente: sin esta comprobación el archivo podría
+        // acabar en cualquier punto del Drive de quien conectó la cuenta.
+        await assertFolderInCompanyTree(selectedFolderId, company.drive_folder_id, company.drive_owner_user_id);
       }
       const targetFolder = selectedFolderId || (auth.user.role === "manager"
         ? taskFolderId
