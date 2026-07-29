@@ -3,6 +3,7 @@ import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { companySchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
+import { cancelCompanyReminders } from "@/lib/tasks/schedule-reminders";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -30,6 +31,13 @@ export async function DELETE(_: Request, context: Context) {
   const auth = await requireApiUser(["admin"]);
   if (auth.error) return auth.error;
   const { id } = await context.params;
+  // Antes del RPC: al borrar notification_logs se pierde el provider_message_id y
+  // los correos ya programados en Resend se entregarían igual, sin forma de pararlos.
+  try {
+    await cancelCompanyReminders(id);
+  } catch (error) {
+    console.error("No se pudieron cancelar los recordatorios de la empresa", error);
+  }
   const { data: deleted, error } = await createAdminClient()
     .rpc("delete_company_cascade", { target_company_id: id });
   if (error) return apiError(error);

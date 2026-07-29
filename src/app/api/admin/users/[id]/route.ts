@@ -4,6 +4,7 @@ import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { updateUserSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
+import { cancelUserReminders } from "@/lib/tasks/schedule-reminders";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -73,6 +74,12 @@ export async function DELETE(_: Request, context: Context) {
         { status: 409 },
       );
     }
+  }
+  // Antes del RPC, por el mismo motivo que en la eliminación de empresas.
+  try {
+    await cancelUserReminders(target.id);
+  } catch (error) {
+    console.error("No se pudieron cancelar los recordatorios del usuario", error);
   }
   const { data: deleted, error } = await supabase.rpc("delete_user_cascade", { target_user_id: target.id });
   if (error) return apiError(error);

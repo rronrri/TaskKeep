@@ -193,6 +193,63 @@ async function scheduleMissing(
   return { scheduled, failed };
 }
 
+type ScheduledRow = { id: string; provider_message_id: string | null; sent_at: string | null };
+
+/**
+ * Cancela en Resend las filas indicadas y marca como `cancelled` únicamente las
+ * que se pudieron cancelar de verdad.
+ *
+ * Antes se marcaban todas por igual aunque la llamada a Resend hubiera fallado, y
+ * quedaba un registro diciendo "cancelado" mientras el correo seguía en cola.
+ */
+async function cancelRows(
+  supabase: ReturnType<typeof createAdminClient>,
+  client: NonNullable<ReturnType<typeof reminderClient>>,
+  rows: ScheduledRow[],
+  now: Date,
+) {
+  if (rows.length === 0) return { cancelled: 0, failed: 0 };
+  const cancelled: string[] = [];
+  let failed = 0;
+
+  await Promise.all(rows.map(async (row) => {
+    // Si la hora de disparo ya pasó, Resend ya lo envió: no hay nada que cancelar,
+    // pero la fila deja de estar pendiente.
+    const fireTime = row.sent_at ? new Date(row.sent_at).getTime() : 0;
+    if (!row.provider_message_id || fireTime <= now.getTime()) {
+      cancelled.push(row.id);
+      return;
+    }
+    try {
+      const result = await client.resend.emails.cancel(row.provider_message_id);
+      if (result.error) throw new Error(result.error.message);
+      cancelled.push(row.id);
+    } catch (error) {
+      failed += 1;
+      console.error("No se pudo cancelar un recordatorio en Resend", row.provider_message_id, error);
+    }
+  }));
+
+  if (cancelled.length > 0) {
+    const { error } = await supabase
+      .from("notification_logs")
+      .update({ status: "cancelled" })
+      .in("id", cancelled);
+    if (error) console.error("No se pudo marcar los recordatorios como cancelados", error.message);
+  }
+  return { cancelled: cancelled.length, failed };
+}
+
+async function pendingRowsForTasks(supabase: ReturnType<typeof createAdminClient>, taskIds: string[]) {
+  if (taskIds.length === 0) return [] as ScheduledRow[];
+  const { data } = await supabase
+    .from("notification_logs")
+    .select("id,provider_message_id,sent_at")
+    .in("task_id", taskIds)
+    .eq("status", "scheduled");
+  return (data ?? []) as ScheduledRow[];
+}
+
 // Cancela en Resend todos los recordatorios futuros aún programados de una tarea.
 async function cancelScheduled(
   supabase: ReturnType<typeof createAdminClient>,
@@ -205,18 +262,7 @@ async function cancelScheduled(
     .select("id,provider_message_id,sent_at")
     .eq("task_id", taskId)
     .eq("status", "scheduled");
-  await Promise.allSettled((rows ?? []).map(async (row) => {
-    // Si la hora de disparo ya pasó, Resend ya lo envió: no intentamos cancelar.
-    const fireTime = row.sent_at ? new Date(row.sent_at).getTime() : 0;
-    if (row.provider_message_id && fireTime > now.getTime()) {
-      await client.resend.emails.cancel(row.provider_message_id);
-    }
-  }));
-  await supabase
-    .from("notification_logs")
-    .update({ status: "cancelled" })
-    .eq("task_id", taskId)
-    .eq("status", "scheduled");
+  await cancelRows(supabase, client, (rows ?? []) as ScheduledRow[], now);
 }
 
 async function loadTask(supabase: ReturnType<typeof createAdminClient>, taskId: string) {
@@ -252,6 +298,81 @@ export async function cancelTaskReminders(taskId: string) {
   if (!client) return;
   const supabase = createAdminClient();
   await cancelScheduled(supabase, client, taskId, new Date());
+}
+
+/**
+ * Cancela los recordatorios de varias tareas a la vez. Se usa al eliminar una
+ * carpeta, que archiva todas las tareas que contiene.
+ */
+export async function cancelRemindersForTasks(taskIds: string[]) {
+  const client = reminderClient();
+  if (!client || taskIds.length === 0) return;
+  const supabase = createAdminClient();
+  const rows = await pendingRowsForTasks(supabase, taskIds);
+  await cancelRows(supabase, client, rows, new Date());
+}
+
+/**
+ * Cancela todo lo programado para una empresa antes de eliminarla.
+ *
+ * Debe ejecutarse ANTES de `delete_company_cascade`: esa función borra las filas
+ * de `notification_logs`, y con ellas el `provider_message_id`, único dato que
+ * permite cancelar el envío en Resend. Si se borra primero, los correos quedan en
+ * cola de forma irreversible y se entregan igual durante semanas.
+ */
+export async function cancelCompanyReminders(companyId: string) {
+  const client = reminderClient();
+  if (!client) return;
+  const supabase = createAdminClient();
+
+  const [{ data: tasks }, { data: users }] = await Promise.all([
+    supabase.from("tasks").select("id").eq("company_id", companyId),
+    supabase.from("users").select("id").eq("company_id", companyId),
+  ]);
+
+  const rows = new Map<string, ScheduledRow>();
+  for (const row of await pendingRowsForTasks(supabase, (tasks ?? []).map((task) => task.id))) {
+    rows.set(row.id, row);
+  }
+  const userIds = (users ?? []).map((user) => user.id);
+  if (userIds.length > 0) {
+    const { data } = await supabase
+      .from("notification_logs")
+      .select("id,provider_message_id,sent_at")
+      .in("user_id", userIds)
+      .eq("status", "scheduled");
+    for (const row of (data ?? []) as ScheduledRow[]) rows.set(row.id, row);
+  }
+
+  await cancelRows(supabase, client, [...rows.values()], new Date());
+}
+
+/**
+ * Cancela todo lo programado para una persona antes de eliminarla. Mismo motivo de
+ * orden que `cancelCompanyReminders`: `delete_user_cascade` destruye las filas.
+ */
+export async function cancelUserReminders(userId: string) {
+  const client = reminderClient();
+  if (!client) return;
+  const supabase = createAdminClient();
+
+  const { data: tasks } = await supabase
+    .from("tasks")
+    .select("id")
+    .or(`created_by.eq.${userId},responsible_id.eq.${userId}`);
+
+  const rows = new Map<string, ScheduledRow>();
+  for (const row of await pendingRowsForTasks(supabase, (tasks ?? []).map((task) => task.id))) {
+    rows.set(row.id, row);
+  }
+  const { data: own } = await supabase
+    .from("notification_logs")
+    .select("id,provider_message_id,sent_at")
+    .eq("user_id", userId)
+    .eq("status", "scheduled");
+  for (const row of (own ?? []) as ScheduledRow[]) rows.set(row.id, row);
+
+  await cancelRows(supabase, client, [...rows.values()], new Date());
 }
 
 /**

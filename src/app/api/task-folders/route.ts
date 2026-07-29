@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
+import { cancelRemindersForTasks } from "@/lib/tasks/schedule-reminders";
 
 const folderSchema = z.object({ name: z.string().trim().min(1, "Escribe un nombre").max(80), parent_id: z.string().uuid().nullable().optional() });
 const deleteFolderSchema = z.object({ id: z.string().uuid() });
@@ -151,6 +152,20 @@ export async function DELETE(request: Request) {
     }
     const { error } = await supabase.from("task_folders").delete().eq("id", input.id).eq("company_id", auth.user.companyId!);
     if (error) throw error;
+
+    // Las tareas quedan archivadas, así que sus recordatorios ya no deben salir.
+    // Aquí las filas de notification_logs sobreviven, de modo que la cancelación
+    // puede hacerse después de responder.
+    const archivedIds = (taskRows ?? []).map((row) => row.id);
+    if (archivedIds.length > 0) {
+      after(async () => {
+        try {
+          await cancelRemindersForTasks(archivedIds);
+        } catch (reason) {
+          console.error("No se pudieron cancelar los recordatorios de las tareas archivadas", reason);
+        }
+      });
+    }
     await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task_folder.deleted", entityType: "task_folder", entityId: input.id, metadata: { name: folder.name, deletedFolders: snapshot.folders.length, deletedTasks: snapshot.tasks.length } });
     return NextResponse.json({ data: { id: input.id, deleted_folder_ids: folderIds, snapshot } });
   } catch (error) {
