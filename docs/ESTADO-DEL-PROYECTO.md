@@ -30,7 +30,7 @@ Google Drive y recordatorios por correo. Monolito Next.js sobre Supabase.
 | Correo | Resend (`@react-email` para las plantillas) |
 | Archivos | Google Drive API v3 + Google Picker, OAuth por empresa |
 | Despliegue | Vercel (auto-deploy desde `main`) · también hay Dockerfile y compose |
-| Tamaño | ~6.900 líneas, 107 archivos `.ts`/`.tsx`, 30 endpoints, 10 migraciones |
+| Tamaño | ~7.050 líneas, 108 archivos `.ts`/`.tsx`, 36 route handlers, 10 migraciones |
 | Historial | 25 commits, del 9 de junio al 28 de julio de 2026 |
 
 ## Arquitectura
@@ -38,7 +38,7 @@ Google Drive y recordatorios por correo. Monolito Next.js sobre Supabase.
 ```
 src/
   app/
-    api/            30 route handlers — toda la lógica de negocio
+    api/            36 route handlers — toda la lógica de negocio
     admin/ manager/ collaborator/    páginas por rol, protegidas en el servidor
     login/ forgot-password/ reset-password/
   components/       UI por dominio (task, admin, calendar, company, user, ui...)
@@ -129,7 +129,7 @@ El detalle técnico está en el documento de auditoría, fuera del repositorio.
 
 ### Deuda técnica importante
 
-- **Cero tests automatizados.** Lo único que hay es `scripts/smoke-test.mjs`: 34 líneas que hacen login y comprueban que ~8 endpoints devuelvan 200. No verifica el aislamiento entre empresas, ni los permisos por rol, ni la lógica de recordatorios. Dado que la seguridad depende de filtros `.eq("company_id")` escritos a mano en 30 endpoints, unos tests de aislamiento son la inversión con mejor relación coste/beneficio del proyecto.
+- **Cero tests automatizados.** Lo único que hay es `scripts/smoke-test.mjs`: 34 líneas que hacen login y comprueban que ~8 endpoints devuelvan 200. No verifica el aislamiento entre empresas, ni los permisos por rol, ni la lógica de recordatorios. Dado que la seguridad depende de filtros `.eq("company_id")` escritos a mano en cada endpoint, unos tests de aislamiento son la inversión con mejor relación coste/beneficio del proyecto.
 - **Sin CI.** No hay GitHub Actions; nada corre `lint` ni `build` antes de un merge. Vercel construye después del push, así que un error de compilación se descubre cuando ya está en `main`.
 - **Sin observabilidad.** Los errores van a `console.error` y quedan en los logs de Vercel, que se retienen poco tiempo. No hay Sentry ni alertas: si el cron falla o Resend rechaza los correos, nadie se entera.
 - **Migraciones manuales.** No hay Supabase CLI ni control de qué migración se aplicó a qué entorno. `scripts/apply-migration.mjs` existe pero no lleva registro. Es fácil que la base de producción quede desincronizada del repo sin que se note.

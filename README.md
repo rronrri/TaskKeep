@@ -11,6 +11,7 @@ amarillo para media, naranja para alta y rojo para crítica.
 |---|---|
 | [`docs/ESTADO-DEL-PROYECTO.md`](docs/ESTADO-DEL-PROYECTO.md) | **Empezar por acá.** Estado actual, arquitectura, qué está terminado y qué falta. |
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | Despliegue en Vercel, variables de entorno y checklist de verificación. |
+| [`docs/superpowers/`](docs/superpowers/) | Spec y plan del rediseño visual «Expediente». |
 | [`GOOGLE_DRIVE_SETUP.md`](GOOGLE_DRIVE_SETUP.md) | Configuración de Google Cloud para Drive y Picker. |
 | [`IMPLEMENTATION_REPORT.md`](IMPLEMENTATION_REPORT.md) | Reporte del 15/06/2026. Desactualizado; se conserva como registro histórico. |
 
