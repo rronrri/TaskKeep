@@ -17,6 +17,8 @@ export interface SessionUser {
   email: string;
   role: UserRole;
   mustChangePassword?: boolean;
+  /** Generación de la sesión; se compara con users.session_epoch para revocarla. */
+  sessionEpoch?: number;
 }
 
 export interface Task {

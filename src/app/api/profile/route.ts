@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { apiError, requireApiUser } from "@/lib/api";
-import { createSession } from "@/lib/auth/session";
+import { createSession, revokeSessions } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/server";
 import { profileSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
@@ -64,6 +64,15 @@ export async function PATCH(request: Request) {
       .select("id,company_id,full_name,email,role,created_at,must_change_password,google_email,google_connected_at,company:companies!users_company_id_fkey(name,drive_folder_url,drive_folder_id,drive_connected_at)")
       .single();
     if (error) throw error;
+
+    // Al cambiar la contraseña se cierran las demás sesiones abiertas, y se reemite
+    // la actual con la generación nueva para no expulsar a quien acaba de hacerlo.
+    let sessionEpoch = auth.user.sessionEpoch ?? 0;
+    if (input.new_password) {
+      const next = await revokeSessions(auth.user.id);
+      if (next !== null) sessionEpoch = next;
+    }
+
     await createSession({
       id: data.id,
       companyId: data.company_id,
@@ -71,6 +80,7 @@ export async function PATCH(request: Request) {
       email: data.email,
       role: data.role,
       mustChangePassword: data.must_change_password,
+      sessionEpoch,
     });
     await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: input.new_password ? "profile.password_changed" : "profile.updated", entityType: "user", entityId: auth.user.id });
     return NextResponse.json({ data });

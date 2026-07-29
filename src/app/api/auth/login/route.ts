@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
     const { data: user } = await supabase
       .from("users")
-      .select("id, company_id, full_name, email, role, password_hash, is_active, must_change_password")
+      .select("id, company_id, full_name, email, role, password_hash, is_active, must_change_password, session_epoch")
       .eq("email", input.email.toLowerCase())
       .is("deleted_at", null)
       .maybeSingle();
@@ -44,6 +44,7 @@ export async function POST(request: Request) {
       email: user.email,
       role: user.role,
       mustChangePassword: user.must_change_password,
+      sessionEpoch: user.session_epoch ?? 0,
     });
     return NextResponse.json({ role: user.role, mustChangePassword: user.must_change_password });
   } catch (error) {

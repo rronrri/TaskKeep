@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
-import { getSession } from "@/lib/auth/session";
+import { getVerifiedSession } from "@/lib/auth/session";
 import { DriveFolderNotAllowedError } from "@/lib/google-drive/errors";
 import type { UserRole } from "@/types";
 
@@ -8,7 +8,7 @@ export async function requireApiUser(
   roles?: UserRole[],
   options?: { allowTemporaryPassword?: boolean },
 ) {
-  const user = await getSession();
+  const user = await getVerifiedSession();
   if (!user) return { error: NextResponse.json({ error: "No autenticado" }, { status: 401 }) };
   if (user.mustChangePassword && !options?.allowTemporaryPassword) {
     return {

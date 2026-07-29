@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Activity, BellRing, Building2, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, Settings, Users } from "lucide-react";
-import { getSession } from "@/lib/auth/session";
+import { getVerifiedSession } from "@/lib/auth/session";
 import type { UserRole } from "@/types";
 import { AccountMenu } from "./account-menu";
 
 
 export async function AppShell({ role, children }: { role: UserRole; children: React.ReactNode }) {
-  const user = await getSession();
+  const user = await getVerifiedSession();
   if (!user) redirect("/login");
   if (user.role !== role) redirect(`/${user.role}/dashboard`);
   const regularLinks = [

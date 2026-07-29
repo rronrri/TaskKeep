@@ -3,7 +3,9 @@ const baseUrl = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 async function login(email, password) {
   const response = await fetch(`${baseUrl}/api/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    // El middleware exige demostrar mismo origen en toda petición que modifica
+    // datos. Los clientes que no son navegadores deben declarar su Origin.
+    headers: { "Content-Type": "application/json", Origin: baseUrl },
     body: JSON.stringify({ email, password }),
   });
   if (!response.ok) throw new Error(`Login falló para ${email}: ${response.status}`);

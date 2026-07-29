@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { apiError } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
+import { revokeSessions } from "@/lib/auth/session";
 import { protectMutation } from "@/lib/security";
 
 const schema = z.object({ token: z.string().min(32), password: z.string().min(8).max(128) });
@@ -24,6 +25,8 @@ export async function POST(request: Request) {
     if (userError) throw userError;
     const { error: tokenError } = await supabase.from("password_reset_tokens").update({ used_at: now }).eq("id", reset.id);
     if (tokenError) throw tokenError;
+    // Si la cuenta estaba secuestrada, cambiar la contraseña debe echar al intruso.
+    await revokeSessions(reset.user_id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return apiError(error);

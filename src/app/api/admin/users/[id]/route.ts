@@ -4,6 +4,7 @@ import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { updateUserSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
+import { revokeSessions } from "@/lib/auth/session";
 import { cancelUserReminders } from "@/lib/tasks/schedule-reminders";
 
 type Context = { params: Promise<{ id: string }> };
@@ -41,6 +42,8 @@ export async function PATCH(request: Request, context: Context) {
       .select("id, company_id, full_name, email, role, is_active, created_at")
       .single();
     if (error) throw error;
+    // Cambiarle la contraseña a alguien cierra sus sesiones abiertas.
+    if (input.password) await revokeSessions(target.id);
     await writeAudit({ actorId: auth.user.id, companyId: data.company_id, action: "user.updated", entityType: "user", entityId: data.id });
     return NextResponse.json({ data });
   } catch (error) {
