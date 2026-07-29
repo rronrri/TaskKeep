@@ -4,7 +4,7 @@ import { createSession } from "@/lib/auth/session";
 import { apiError } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { loginSchema } from "@/lib/validators";
-import { clearFailedLogins, isAccountLocked, protectMutation, registerFailedLogin } from "@/lib/security";
+import { isAccountLocked, protectMutation, registerFailedLogin, registerSuccessfulLogin } from "@/lib/security";
 
 export async function POST(request: Request) {
   const blocked = await protectMutation(request, { scope: "login", limit: 10, windowMs: 10 * 60_000 });
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Credenciales inválidas" }, { status: 401 });
     }
 
-    await clearFailedLogins(user.id);
+    await registerSuccessfulLogin(user.id);
     await createSession({
       id: user.id,
       companyId: user.company_id,

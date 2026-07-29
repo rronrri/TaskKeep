@@ -114,7 +114,15 @@ export async function registerFailedLogin(email: string) {
   if (error) console.error("No se pudo registrar el intento fallido de acceso", error.message);
 }
 
-export async function clearFailedLogins(userId: string) {
-  const { error } = await createAdminClient().rpc("clear_failed_logins", { target_user_id: userId });
-  if (error) console.error("No se pudo reiniciar el contador de accesos fallidos", error.message);
+/**
+ * Cierra un acceso correcto: reinicia el contador de fallos y deja constancia de
+ * la fecha, que es lo que permite distinguir una cuenta activa de una abandonada
+ * en el panel de adopción.
+ */
+export async function registerSuccessfulLogin(userId: string) {
+  const { error } = await createAdminClient()
+    .from("users")
+    .update({ failed_login_attempts: 0, locked_until: null, last_login_at: new Date().toISOString() })
+    .eq("id", userId);
+  if (error) console.error("No se pudo registrar el acceso", error.message);
 }

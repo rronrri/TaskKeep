@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Activity, BellRing, Building2, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, Settings, Users } from "lucide-react";
+import { Activity, BellRing, Building2, CalendarDays, ChartNoAxesColumn, ClipboardCheck, ClipboardList, LayoutDashboard, Settings, Users } from "lucide-react";
 import { getVerifiedSession } from "@/lib/auth/session";
 import type { UserRole } from "@/types";
 import { AccountMenu } from "./account-menu";
@@ -16,6 +16,7 @@ export async function AppShell({ role, children }: { role: UserRole; children: R
     ...(role !== "admin" ? [{ href: `/${role}/calendar`, label: "Calendario", icon: CalendarDays }] : []),
     ...(role === "manager" ? [{ href: "/manager/status-requests", label: "Aprobaciones", icon: ClipboardCheck }] : []),
     ...(role === "admin" ? [{ href: "/admin/companies", label: "Empresas", icon: Building2 }] : []),
+    ...(role === "admin" ? [{ href: "/admin/adoption", label: "Adopción", icon: ChartNoAxesColumn }] : []),
     ...(role !== "collaborator" ? [{ href: `/${role}/collaborators`, label: "Personas", icon: Users }] : []),
     ...(role === "admin" ? [{ href: "/admin/logs", label: "Auditoría", icon: Activity }] : []),
     ...(role === "admin" ? [{ href: "/admin/notifications", label: "Recordatorios", icon: BellRing }] : []),
