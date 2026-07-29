@@ -3,8 +3,16 @@
 Aplicación monolítica con Next.js 16, React 19, TypeScript, Tailwind CSS y Supabase para gestionar empresas, usuarios, tareas, aprobaciones, archivos y recordatorios.
 
 Las tarjetas usan colores predeterminados según su prioridad: verde para baja,
-amarillo para media, naranja para alta y rojo para crítica. Consulta
-`IMPLEMENTATION_REPORT.md` para conocer el estado funcional y los módulos pendientes.
+amarillo para media, naranja para alta y rojo para crítica.
+
+## Documentación
+
+| Documento | Contenido |
+|---|---|
+| [`docs/ESTADO-DEL-PROYECTO.md`](docs/ESTADO-DEL-PROYECTO.md) | **Empezar por acá.** Estado actual, arquitectura, qué está terminado y qué falta. |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Despliegue en Vercel, variables de entorno y checklist de verificación. |
+| [`GOOGLE_DRIVE_SETUP.md`](GOOGLE_DRIVE_SETUP.md) | Configuración de Google Cloud para Drive y Picker. |
+| [`IMPLEMENTATION_REPORT.md`](IMPLEMENTATION_REPORT.md) | Reporte del 15/06/2026. Desactualizado; se conserva como registro histórico. |
 
 ## Inicio rápido con Docker
 
@@ -78,7 +86,9 @@ Variables críticas:
 
 ## Base de datos
 
-1. Ejecuta `supabase/migrations/202606090001_initial_schema.sql` en Supabase.
+1. Ejecuta **todas** las migraciones de `supabase/migrations/` en el editor SQL de
+   Supabase, en orden alfabético (son 10, desde `202606090001_initial_schema.sql`
+   hasta `202606220001_task_folders.sql`). Vercel no las aplica solo.
 2. Ejecuta `supabase/seed.sql`.
 3. Cambia inmediatamente la contraseña del administrador inicial.
 

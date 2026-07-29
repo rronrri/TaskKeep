@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Auditoría de seguridad: se mantiene fuera del repo (público) hasta aplicar las correcciones
+docs/AUDIT-*.md
