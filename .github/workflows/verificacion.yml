@@ -1,0 +1,101 @@
+name: Verificación
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Un push nuevo cancela la verificación anterior de la misma rama: no tiene
+# sentido gastar minutos en un commit que ya quedó atrás.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  estatico:
+    name: Lint, tipos y compilación
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Comprobación de tipos
+        run: npm run typecheck
+
+      # La compilación no necesita credenciales: las rutas son dinámicas y el
+      # cliente de Supabase se construye dentro de cada manejador, no al importar.
+      - name: Compilación
+        run: npm run build
+
+  aislamiento:
+    name: Aislamiento entre empresas y permisos
+    needs: estatico
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Estas pruebas necesitan una base real: comprueban que cada consulta filtre
+      # por empresa, y con una base simulada pasarían siempre. Si el repositorio no
+      # tiene configurados los secretos, se avisa y se omiten en lugar de fallar.
+      - name: Comprobar credenciales
+        id: credenciales
+        env:
+          DB: ${{ secrets.TEST_POSTGRES_URL_NON_POOLING }}
+        run: |
+          if [ -z "$DB" ]; then
+            echo "disponible=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Sin TEST_POSTGRES_URL_NON_POOLING; se omiten las pruebas de aislamiento."
+          else
+            echo "disponible=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compilación
+        if: steps.credenciales.outputs.disponible == 'true'
+        run: npm run build
+
+      - name: Levantar la aplicación
+        if: steps.credenciales.outputs.disponible == 'true'
+        env:
+          APP_URL: http://localhost:3000
+          JWT_SECRET: ${{ secrets.TEST_JWT_SECRET }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          npm run start > /tmp/servidor.log 2>&1 &
+          for _ in $(seq 1 45); do
+            if curl -sf http://localhost:3000/api/health > /dev/null; then
+              echo "Aplicación lista."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "La aplicación no respondió a tiempo."
+          cat /tmp/servidor.log
+          exit 1
+
+      - name: Pruebas de aislamiento
+        if: steps.credenciales.outputs.disponible == 'true'
+        env:
+          TEST_BASE_URL: http://localhost:3000
+          POSTGRES_URL_NON_POOLING: ${{ secrets.TEST_POSTGRES_URL_NON_POOLING }}
+        run: npm run test:isolation
+
+      - name: Registro del servidor si algo falló
+        if: failure() && steps.credenciales.outputs.disponible == 'true'
+        run: cat /tmp/servidor.log || true

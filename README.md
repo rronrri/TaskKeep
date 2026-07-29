@@ -159,3 +159,48 @@ npm run lint
 npm run build
 npm run start
 ```
+
+## Pruebas
+
+```bash
+npm run lint        # ESLint
+npm run typecheck   # tsc --noEmit
+npm run build       # compilación de producción
+npm run test:isolation
+```
+
+`test:isolation` comprueba el aislamiento entre empresas y los permisos por rol.
+Se ejecuta contra una aplicación levantada y una base real, porque lo que verifica
+es que cada consulta filtre por `company_id`: con una base simulada pasaría
+siempre. Necesita dos variables:
+
+```bash
+TEST_BASE_URL=http://localhost:3000 \
+POSTGRES_URL_NON_POOLING="postgres://..." \
+npm run test:isolation
+```
+
+Crea dos empresas con sus usuarios, tareas y carpetas, ejerce los casos y borra
+todo al terminar. Cada caso indica el incidente que lo motivó.
+
+Para repetir la suite contra un servidor que ya estaba en marcha hay que
+reiniciarlo: el limitador de intentos guarda un contador en memoria del proceso y
+siete inicios de sesión por ejecución agotan el margen en la segunda pasada. En
+integración continua no aplica, porque cada ejecución arranca un proceso nuevo.
+
+### Integración continua
+
+`.github/workflows/verificacion.yml` ejecuta lint, tipos y compilación en cada
+push a `main` y en cada pull request. Las pruebas de aislamiento corren después,
+y sólo si el repositorio tiene configurados estos secretos; si faltan, se omiten
+con un aviso en lugar de fallar:
+
+| Secreto | Contenido |
+|---|---|
+| `TEST_POSTGRES_URL_NON_POOLING` | cadena de conexión de la base de pruebas |
+| `TEST_SUPABASE_URL` | URL del proyecto Supabase de pruebas |
+| `TEST_SUPABASE_SERVICE_ROLE_KEY` | clave de servicio de ese proyecto |
+| `TEST_JWT_SECRET` | cualquier cadena de 32 caracteres o más |
+
+Conviene apuntarlos a un proyecto Supabase **de pruebas**, no al de producción:
+la suite escribe y borra datos.

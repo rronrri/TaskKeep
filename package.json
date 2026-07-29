@@ -10,7 +10,9 @@
     "test:smoke": "node scripts/smoke-test.mjs",
     "docker:dev": "docker compose -f compose.yml -f compose.dev.yml up --build",
     "docker:prod": "docker compose -f compose.yml up --build -d",
-    "docker:down": "docker compose -f compose.yml down"
+    "docker:down": "docker compose -f compose.yml down",
+    "test:isolation": "node --test \"tests/*.test.mjs\"",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.20",
