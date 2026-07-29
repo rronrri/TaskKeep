@@ -6,9 +6,9 @@
   --surface: #fdfcf8;
   --ink: #1f2823;
   --ink-soft: #5c645e;
-  --primary: #16404d;
-  --primary-strong: #0e2e38;
-  --primary-wash: #e7eef0;
+  --primary: #262e6e;
+  --primary-strong: #1b2151;
+  --primary-wash: #e9ebf5;
   --stamp-red: #a5311f;
   --stamp-red-wash: #f6e9e6;
   --line: #ded9cb;
@@ -44,9 +44,22 @@ button, input, select, textarea { font: inherit; }
 button:not(:disabled), a[href], select, label[for], input[type="checkbox"], input[type="radio"] { cursor: pointer; }
 button, a[href], select { transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
 button:disabled { cursor: not-allowed; }
-:focus-visible { outline: 3px solid #6c98a5; outline-offset: 2px; }
+:focus-visible { outline: 3px solid #7b86c7; outline-offset: 2px; }
 @keyframes toast-life { from { width: 100%; } to { width: 0%; } }
 @keyframes dialog-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+
+/* La marca se dibuja al entrar: primero el escudo, después las verificaciones.
+   `pathLength` normaliza cada trazo a 1, así el ritmo no depende de su longitud. */
+@keyframes logo-stroke { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.logo-draw path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: logo-stroke 900ms cubic-bezier(.65,0,.35,1) forwards;
+}
+.logo-draw > path { animation-duration: 1100ms; }
+.logo-draw g path:nth-child(1) { animation-delay: 420ms; }
+.logo-draw g path:nth-child(2) { animation-delay: 560ms; }
+.logo-draw g path:nth-child(3) { animation-delay: 700ms; }
 
 /* ── Botones ── */
 .btn {
@@ -213,4 +226,5 @@ button:disabled { cursor: not-allowed; }
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   .btn:not(:disabled):active { transform: none; }
   .stamp-seal { transform: none; }
+  .logo-draw path { stroke-dasharray: none; stroke-dashoffset: 0; animation: none; }
 }

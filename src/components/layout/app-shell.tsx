@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Activity, BellRing, Building2, CalendarDays, ChartNoAxesColumn, ClipboardCheck, ClipboardList, LayoutDashboard, Settings, Users } from "lucide-react";
 import { getVerifiedSession } from "@/lib/auth/session";
 import type { UserRole } from "@/types";
+import { Logo, LogoMark } from "@/components/ui/logo";
 import { AccountMenu } from "./account-menu";
 
 
@@ -29,7 +30,7 @@ export async function AppShell({ role, children }: { role: UserRole; children: R
           horizontal sobre el contenido, y el logotipo se oculta porque la
           cabecera ya lo muestra: repetirlo consumía una franja de alto útil. */}
       <aside className="border-b border-[var(--line)] bg-[var(--paper-deep)] px-3 py-2 md:min-h-screen md:border-b-0 md:border-r md:p-5">
-        <div className="mb-8 hidden font-display text-2xl font-bold text-[var(--primary)] md:block">TaskKeep</div>
+        <Logo size={30} className="mb-8 hidden text-[var(--primary)] md:flex" />
         <nav aria-label="Navegación principal" className="-mx-1 flex gap-1 overflow-x-auto px-1 md:mx-0 md:flex-col md:gap-2 md:overflow-visible md:px-0">
           {links.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} className="flex shrink-0 flex-col items-center gap-1 rounded-md border-transparent px-3 py-2 text-[11px] font-semibold text-[var(--ink-soft)] hover:bg-[var(--primary-wash)] hover:text-[var(--primary)] md:flex-row md:gap-3 md:border-l-[3px] md:py-2.5 md:text-sm md:hover:border-[var(--primary)]">
@@ -40,7 +41,7 @@ export async function AppShell({ role, children }: { role: UserRole; children: R
       </aside>
       <div>
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-4 py-3 md:static md:px-8 md:py-4">
-          <div className="min-w-0"><p className="font-display text-sm font-bold text-[var(--primary)]">TaskKeep</p><p className="folio truncate">Gestión de tareas</p></div>
+          <div className="flex min-w-0 items-center gap-2 text-[var(--primary)]"><LogoMark size={26} className="shrink-0" /><div className="min-w-0"><p className="font-display text-sm font-bold">TaskKeep</p><p className="folio truncate">Gestión de tareas</p></div></div>
           <AccountMenu fullName={user.fullName} role={user.role} />
         </header>
         <main className="p-4 sm:p-5 md:p-8">

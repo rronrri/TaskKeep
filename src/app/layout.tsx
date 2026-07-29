@@ -7,8 +7,8 @@ const sourceSerif = Source_Serif_4({ variable: "--font-source-serif", subsets: [
 const plexMono = IBM_Plex_Mono({ variable: "--font-plex-mono", weight: ["400", "600", "700"], subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "TaskKeep Empresarial",
-  description: "Gestión empresarial de tareas, responsables y recordatorios",
+  title: "TaskKeep",
+  description: "Prioriza lo que importa. Recuerda todo. Gestión empresarial de tareas, responsables y recordatorios.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
