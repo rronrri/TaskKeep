@@ -123,8 +123,8 @@ Google Drive funciona por gestor/a, no por empresa: cada uno/a conecta su propia
 2. Los/las colaboradores/as usan la conexión de quien los/las creó.
 3. Cada tarea crea su propia carpeta `AAAA-MM-DD - nombre de tarea` directo en "Mi unidad" de quien la posee (el/la gestor/a responsable, o quien creó al/a la colaborador/a responsable). Desde la tarea se puede elegir otra carpeta con el selector de Google si esa tarea debe ir a otro lugar.
 4. Si se borra el último adjunto desde la tarea, esa carpeta se borra si queda vacía; borrar la tarea nunca toca Drive.
-5. Los archivos de colaboradores/as se suben a `Pendientes` y luego el/la gestor/a los aprueba o rechaza.
-6. Al aprobar, el archivo se mueve a la carpeta principal de la tarea o a una subcarpeta elegida.
+5. Los archivos de colaboradores/as se suben directo a la carpeta de la tarea (igual que los de gestores/as) y quedan en estado "pendiente" dentro de TaskKeep hasta que el/la gestor/a los aprueba o rechaza.
+6. Al aprobar, el/la gestor/a puede además moverlos a otra carpeta si elige una con el selector.
 
 Variables necesarias:
 

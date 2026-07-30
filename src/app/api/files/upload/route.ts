@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
-import { buildTaskFolderName, createDriveFolder, findOrCreateDriveFolder, uploadToDrive } from "@/lib/google-drive";
+import { buildTaskFolderName, createDriveFolder, uploadToDrive } from "@/lib/google-drive";
 import { resolveDriveOwner } from "@/lib/google-drive/resolve-owner";
 import { createAdminClient } from "@/lib/supabase/server";
 import { protectMutation } from "@/lib/security";
@@ -52,13 +52,14 @@ export async function POST(request: Request) {
       // El destino, elegido o no por el cliente, siempre sale de una carpeta ya
       // creada por la app o elegida con el Picker del mismo gestor/a dueño/a: el
       // alcance `drive.file` ya impide que apunte a cualquier otro lugar de su
-      // cuenta, así que no hace falta validar un árbol de carpetas propio.
+      // cuenta, así que no hace falta validar un árbol de carpetas propio. Todo
+      // el mundo sube directo a la carpeta de la tarea, sin subcarpeta
+      // intermedia: la aprobación de colaboradores/as es solo un estado dentro
+      // de TaskKeep, no algo que se refleje moviendo el archivo en Drive.
       let drive: Awaited<ReturnType<typeof uploadToDrive>>;
       let targetFolder: string;
       try {
-        targetFolder = selectedFolderId || (auth.user.role === "manager"
-          ? taskFolderId
-          : (await findOrCreateDriveFolder("Pendientes", taskFolderId, owner.ownerId)).id);
+        targetFolder = selectedFolderId || taskFolderId;
         drive = await uploadToDrive(file, targetFolder, owner.ownerId);
       } catch (uploadError) {
         // La carpeta guardada de la tarea ya no existe en Drive (se borró a mano,
@@ -70,9 +71,7 @@ export async function POST(request: Request) {
         const freshFolder = await createDriveFolder(buildTaskFolderName(task.title, task.created_at), "root", owner.ownerId);
         taskFolderId = freshFolder.id;
         await supabase.from("tasks").update({ drive_folder_id: taskFolderId, drive_folder_name: freshFolder.name }).eq("id", task.id);
-        targetFolder = auth.user.role === "manager"
-          ? taskFolderId
-          : (await findOrCreateDriveFolder("Pendientes", taskFolderId, owner.ownerId)).id;
+        targetFolder = taskFolderId;
         drive = await uploadToDrive(file, targetFolder, owner.ownerId);
       }
       const { data, error } = await supabase.from("task_files").insert({

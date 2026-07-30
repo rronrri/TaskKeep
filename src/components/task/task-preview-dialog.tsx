@@ -171,7 +171,11 @@ export function TaskPreviewDialog({
         })
         .build();
       setPickerOpen(true);
-      picker.setVisible(true);
+      // El Picker mide la página al mostrarse; si el diálogo todavía no soltó
+      // el bloqueo de scroll (React aplica el cambio de `modal` un instante
+      // después de este `setPickerOpen`), el Picker se centra mal. Un frame
+      // de margen alcanza para que el DOM ya esté actualizado.
+      requestAnimationFrame(() => picker.setVisible(true));
     } catch (reason) {
       setPickerOpen(false);
       setError(reason instanceof Error ? reason.message : "No se pudo abrir Google Picker");
@@ -273,9 +277,10 @@ export function TaskPreviewDialog({
           <div className="mt-4">
             {/* El selector de carpetas usa el token de Google del/de la gestor/a
                 dueño/a del equipo de esta tarea, así que solo se ofrece a quien
-                es ese/a dueño/a. Los archivos de colaboradores/as van a
-                "Pendientes" y es el/la gestor/a quien elige el destino final al
-                aprobarlos. */}
+                es ese/a dueño/a. Los archivos de colaboradores/as suben directo
+                a la carpeta de la tarea igual que los de gestores/as; la
+                aprobación es solo un estado dentro de TaskKeep, no una carpeta
+                distinta en Drive. */}
             {role === "manager" && detail.capabilities.canUpload && !detail.capabilities.driveConfigured && (
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#9A7B24] bg-[#F3EDDC] p-4">
                 <p className="text-sm font-semibold text-[#6b5619]">Conecta tu Google Drive para poder subir archivos en tus tareas.</p>
@@ -298,7 +303,7 @@ export function TaskPreviewDialog({
               </div>
             )}
             {detail.capabilities.canUpload && <div className="mb-4 rounded-md border border-dashed border-[var(--line-strong)] bg-[var(--paper)] p-4"><label className={`inline-flex items-center gap-2 rounded-md px-4 py-2.5 font-bold ${detail.capabilities.driveConfigured ? "bg-[var(--primary)] text-white" : "cursor-not-allowed bg-[var(--paper-deep)] text-[var(--line-strong)]"}`}><Upload size={18} /> Subir archivo<input type="file" className="hidden" disabled={!detail.capabilities.driveConfigured || busy} accept=".pdf,.png,.jpg,.jpeg,.txt,.docx" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); event.target.value = ""; }} /></label><p className="mt-2 text-xs text-[var(--ink-soft)]">{role === "collaborator" ? "Tu archivo quedará pendiente hasta que un/a gestor/a lo apruebe." : "Los archivos subidos por gestores/as quedan aprobados automáticamente."}</p>{!detail.capabilities.driveConfigured && role === "collaborator" && <p className="mt-2 text-xs font-semibold text-[#9A7B24]">El/la gestor/a debe conectar Google Drive y configurar una carpeta raíz desde su perfil.</p>}</div>}
-            {reviewFile && <div className={`mb-4 rounded-md border p-4 ${reviewFile.decision === "approved" ? "border-[#4A7058] bg-[#E9EFEA]" : "border-[var(--stamp-red)] bg-[var(--stamp-red-wash)]"}`}><p className="text-sm font-bold">{reviewFile.decision === "approved" ? "Aprobar" : "Rechazar"} â€œ{reviewFile.name}â€</p>{reviewFile.decision === "approved" && <div className="mt-3 rounded-md border border-[#4A7058] bg-[var(--surface)] p-3"><p className="text-sm font-bold">Guardar en Drive</p><p className="mt-1 text-xs text-[var(--ink-soft)]">{destinationFolderName ? `Seleccionado: ${destinationFolderName}` : "Si no eliges carpeta, se guardara en la carpeta principal de la tarea."}</p><button type="button" disabled={openingPicker || busy} onClick={() => void openDrivePicker()} className="btn btn-ghost mt-3 !px-3 !py-2 text-xs !text-[#4A7058]"><FolderOpen size={15} />{openingPicker ? "Abriendo Google..." : "Elegir carpeta"}</button></div>}<textarea value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} rows={2} placeholder="Comentario opcional para el pasante" className="input mt-3 resize-none !py-2 text-sm" /><div className="mt-3 flex justify-end gap-2"><button onClick={() => { setReviewFile(null); setReviewComment(""); setDestinationFolder(""); setDestinationFolderName(""); }} className="btn btn-ghost !px-3 !py-2 text-sm">Cancelar</button><button disabled={busy} onClick={() => void reviewUploadedFile()} className={`btn !px-3 !py-2 text-sm text-white ${reviewFile.decision === "approved" ? "!bg-[#4A7058] hover:!bg-[#3a5946]" : "btn-danger"}`}>Confirmar</button></div></div>}
+            {reviewFile && <div className={`mb-4 rounded-md border p-4 ${reviewFile.decision === "approved" ? "border-[#4A7058] bg-[#E9EFEA]" : "border-[var(--stamp-red)] bg-[var(--stamp-red-wash)]"}`}><p className="text-sm font-bold">{reviewFile.decision === "approved" ? "Aprobar" : "Rechazar"} &quot;{reviewFile.name}&quot;</p>{reviewFile.decision === "approved" && <div className="mt-3 rounded-md border border-[#4A7058] bg-[var(--surface)] p-3"><p className="text-sm font-bold">Guardar en Drive</p><p className="mt-1 text-xs text-[var(--ink-soft)]">{destinationFolderName ? `Seleccionado: ${destinationFolderName}` : "Si no eliges carpeta, se guardara en la carpeta principal de la tarea."}</p><button type="button" disabled={openingPicker || busy} onClick={() => void openDrivePicker()} className="btn btn-ghost mt-3 !px-3 !py-2 text-xs !text-[#4A7058]"><FolderOpen size={15} />{openingPicker ? "Abriendo Google..." : "Elegir carpeta"}</button></div>}<textarea value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} rows={2} placeholder="Comentario opcional para el pasante" className="input mt-3 resize-none !py-2 text-sm" /><div className="mt-3 flex justify-end gap-2"><button onClick={() => { setReviewFile(null); setReviewComment(""); setDestinationFolder(""); setDestinationFolderName(""); }} className="btn btn-ghost !px-3 !py-2 text-sm">Cancelar</button><button disabled={busy} onClick={() => void reviewUploadedFile()} className={`btn !px-3 !py-2 text-sm text-white ${reviewFile.decision === "approved" ? "!bg-[#4A7058] hover:!bg-[#3a5946]" : "btn-danger"}`}>Confirmar</button></div></div>}
             <div className="space-y-3">{detail.files.length === 0 ? <p className="rounded-md bg-[var(--paper)] p-4 text-sm text-[var(--ink-soft)]">No hay archivos adjuntos.</p> : detail.files.map((file) => {
               const canRemove = detail.capabilities.canReviewFiles || file.uploaded_by === detail.capabilities.currentUserId;
               return <article key={file.id} className="rounded-md border border-[var(--line)] p-3">

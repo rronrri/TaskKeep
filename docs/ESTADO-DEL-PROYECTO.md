@@ -96,7 +96,7 @@ Todo lo siguiente está implementado y funcionando en producción:
 - OAuth por gestor/a, no por empresa: cada uno/a conecta su propia cuenta, independiente de otros/as gestores/as de la misma empresa; los/las colaboradores/as usan la conexión de quien los/las creó.
 - Sin carpeta raíz que configurar aparte: cada tarea genera automáticamente su carpeta `AAAA-MM-DD - título` directo en "Mi unidad" de quien la posee, y se puede elegir otra carpeta por tarea con el selector de Google. Si se borra el último adjunto desde la tarea, la carpeta vacía se borra también; borrar la tarea nunca toca Drive.
 - Subida de archivos con validación de tipo (PDF, PNG, JPEG, TXT, DOCX) y tamaño (10 MB).
-- Los archivos de colaboradores/as van a `Pendientes` y requieren aprobación; al aprobarse se mueven a la carpeta de la tarea o a una subcarpeta elegida.
+- Los archivos de colaboradores/as suben directo a la carpeta de la tarea y requieren aprobación (estado dentro de TaskKeep, no una carpeta distinta); al aprobarse, el/la gestor/a puede además moverlos a otra carpeta.
 - Explorador de carpetas y creación de subcarpetas desde la interfaz, con Google Picker.
 
 **Recordatorios**

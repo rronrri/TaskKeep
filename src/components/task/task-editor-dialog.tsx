@@ -182,7 +182,11 @@ export function TaskEditorDialog({
         })
         .build();
       setPickerOpen(true);
-      picker.setVisible(true);
+      // El Picker mide la página al mostrarse; si el diálogo todavía no soltó
+      // el bloqueo de scroll (React aplica el cambio de `modal` un instante
+      // después de este `setPickerOpen`), el Picker se centra mal. Un frame
+      // de margen alcanza para que el DOM ya esté actualizado.
+      requestAnimationFrame(() => picker.setVisible(true));
     } catch (reason) {
       setPickerOpen(false);
       setDriveError(reason instanceof Error ? reason.message : "No se pudo abrir Google Picker");

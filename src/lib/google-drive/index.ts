@@ -74,12 +74,6 @@ export async function listDriveFolders(parentId: string, ownerId: string) {
   return (result.files ?? []) as Array<{ id: string; name: string; webViewLink?: string }>;
 }
 
-export async function findOrCreateDriveFolder(name: string, parentId: string, ownerId: string) {
-  const folders = await listDriveFolders(parentId, ownerId);
-  const existing = folders.find((folder) => folder.name === name);
-  return existing ?? createDriveFolder(name, parentId, ownerId);
-}
-
 export async function uploadToDrive(file: File, folderId: string, ownerId: string) {
   const token = await getGoogleAccessToken(ownerId);
   const metadata = { name: file.name, parents: [folderId] };

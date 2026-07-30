@@ -177,9 +177,9 @@ NEXT_PUBLIC_GOOGLE_APP_ID="1049985464679"
    conexión; si es un/a colaborador/a, la conexión de quien lo/la creó
    (`users.created_by`).
 7. Archivos de colaboradores/as:
-   - Se suben a la carpeta `Pendientes`.
-   - El/la gestor/a los aprueba o rechaza.
-   - Al aprobar, se mueven a la carpeta principal de la tarea o a una subcarpeta elegida.
+   - Se suben directo a la carpeta de la tarea, igual que los de gestores/as.
+   - Quedan en estado "pendiente" dentro de TaskKeep hasta que el/la gestor/a los aprueba o rechaza (es solo un estado, no una carpeta distinta en Drive).
+   - Al aprobar, el/la gestor/a puede además moverlos a otra carpeta si elige una con el selector.
 8. Si se borra el último archivo de una tarea desde la propia tarea, TaskKeep borra
    también la carpeta que había creado para ella (para no dejar carpetas vacías en
    Drive). Si en cambio se borra la tarea completa, los archivos y la carpeta en
