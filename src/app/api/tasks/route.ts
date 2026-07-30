@@ -5,7 +5,7 @@ import { taskSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
 import { reminderFields } from "@/lib/tasks/reminders";
 import { syncTaskReminders } from "@/lib/tasks/schedule-reminders";
-import { buildTaskFolderName, createDriveFolder, verifyDriveFolder } from "@/lib/google-drive";
+import { verifyDriveFolder } from "@/lib/google-drive";
 import { resolveDriveOwner } from "@/lib/google-drive/resolve-owner";
 import { resolveTeamIds } from "@/lib/tasks/team-scope";
 
@@ -133,9 +133,11 @@ export async function POST(request: Request) {
       .select()
       .single();
     if (error) throw error;
+    // Sin carpeta asignada a mano, no se crea ninguna todavía: nace recién al
+    // primer uso real (subir un archivo, o abrir el explorador de Drive de la
+    // tarea), no solo por haber creado la tarea.
     after(async () => {
       const results = await Promise.allSettled([
-        assignedFolderId ? Promise.resolve() : createTaskDriveFolder(data.id, data.title, data.created_at, data.responsible_id, auth.user.companyId!),
         writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.created", entityType: "task", entityId: data.id, metadata: { title: data.title } }),
         syncTaskReminders(data.id),
       ]);
@@ -145,18 +147,6 @@ export async function POST(request: Request) {
   } catch (error) {
     return apiError(error);
   }
-}
-
-async function createTaskDriveFolder(taskId: string, title: string, createdAt: string, responsibleId: string, companyId: string) {
-  const supabase = createAdminClient();
-  const owner = await resolveDriveOwner(supabase, companyId, responsibleId);
-  if (!owner) return;
-  // Sin carpeta raíz compartida: cada tarea es una carpeta propia en la raíz
-  // de "Mi unidad" de quien la posee, para que puedan vivir en cualquier
-  // lugar sin depender de una jerarquía común entre gestores/as.
-  const taskFolder = await createDriveFolder(buildTaskFolderName(title, createdAt), "root", owner.ownerId);
-  const { error: updateError } = await supabase.from("tasks").update({ drive_folder_id: taskFolder.id, drive_folder_name: taskFolder.name }).eq("id", taskId);
-  if (updateError) throw updateError;
 }
 
 function reportBackgroundFailures(context: string, results: PromiseSettledResult<unknown>[]) {
