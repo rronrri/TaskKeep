@@ -1,4 +1,4 @@
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
@@ -28,32 +28,9 @@ export async function DELETE(_: Request, context: Context) {
     const { error } = await supabase.from("task_files").update({ deleted_at: new Date().toISOString() }).eq("id", id);
     if (error) throw error;
     await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "file.deleted", entityType: "task_file", entityId: id });
-    // Si tras borrar este adjunto la tarea se queda sin archivos activos, la
-    // carpeta que el sistema creó para ella en Drive ya no sirve de nada: se
-    // borra para no dejar carpetas vacías acumulándose. Esto NO se ejecuta al
-    // borrar la tarea completa (esa ruta no toca Drive), solo al borrar un
-    // adjunto puntual desde la tarea.
-    if (owner && task.drive_folder_id) {
-      const ownerId = owner.ownerId;
-      const folderId = task.drive_folder_id;
-      const taskId = task.id;
-      after(async () => {
-        try {
-          const { count, error: countError } = await supabase
-            .from("task_files")
-            .select("id", { count: "exact", head: true })
-            .eq("task_id", taskId)
-            .is("deleted_at", null);
-          if (countError) throw countError;
-          if (count === 0) {
-            await deleteDriveFile(folderId, ownerId);
-            await supabase.from("tasks").update({ drive_folder_id: null, drive_folder_name: null }).eq("id", taskId);
-          }
-        } catch (cleanupError) {
-          console.error("No se pudo limpiar la carpeta vacía de la tarea en Drive", cleanupError);
-        }
-      });
-    }
+    // La carpeta de la tarea en Drive se queda aunque se borren todos sus
+    // archivos: puede ser una carpeta que el/la gestor/a eligió a mano, no
+    // solo la automática, así que no se borra sola por quedar vacía.
     return NextResponse.json({ ok: true });
   } catch (error) {
     return apiError(error);
