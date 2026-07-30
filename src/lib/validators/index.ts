@@ -43,6 +43,7 @@ export const taskSchema = z.object({
   status: z.enum(["pending", "in_progress", "completed"]).default("pending"),
   is_pinned: z.boolean().default(false),
   folder_id: z.string().uuid().nullable().optional(),
+  drive_folder_id: z.string().trim().min(10).max(200).optional(),
   reminder_mode: reminderModeSchema.default("none"),
   reminder_settings: reminderSettingsSchema,
 }).superRefine((value, context) => {
@@ -68,6 +69,7 @@ export const updateTaskSchema = z.object({
   priority: z.enum(["low", "medium", "high", "critical"]).optional(),
   status: z.enum(["pending", "in_progress", "completed"]).optional(),
   is_pinned: z.boolean().optional(),
+  drive_folder_id: z.string().trim().min(10).max(200).nullable().optional(),
   reminder_mode: reminderModeSchema.optional(),
   reminder_settings: reminderSettingsSchema.optional(),
 }).superRefine((value, context) => {

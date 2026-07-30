@@ -5,7 +5,7 @@ import { taskSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
 import { reminderFields } from "@/lib/tasks/reminders";
 import { syncTaskReminders } from "@/lib/tasks/schedule-reminders";
-import { buildTaskFolderName, createDriveFolder } from "@/lib/google-drive";
+import { buildTaskFolderName, createDriveFolder, verifyDriveFolder } from "@/lib/google-drive";
 import { resolveDriveOwner } from "@/lib/google-drive/resolve-owner";
 import { resolveTeamIds } from "@/lib/tasks/team-scope";
 
@@ -101,6 +101,19 @@ export async function POST(request: Request) {
       .in("id", teamIds)
       .maybeSingle();
     if (!responsible) return NextResponse.json({ error: "Responsable no válido" }, { status: 400 });
+    let assignedFolderId: string | null = null;
+    let assignedFolderName: string | null = null;
+    if (input.drive_folder_id && auth.user.role === "manager") {
+      const owner = await resolveDriveOwner(supabase, auth.user.companyId!, input.responsible_id);
+      if (!owner) return NextResponse.json({ error: "Conecta Google Drive antes de asignar una carpeta" }, { status: 409 });
+      try {
+        const verified = await verifyDriveFolder(input.drive_folder_id, owner.ownerId);
+        assignedFolderId = verified.id;
+        assignedFolderName = verified.name;
+      } catch {
+        return NextResponse.json({ error: "No se pudo validar la carpeta de Google Drive elegida" }, { status: 400 });
+      }
+    }
     if (input.folder_id) {
       const { data: folder, error: folderError } = await supabase
         .from("task_folders")
@@ -116,13 +129,13 @@ export async function POST(request: Request) {
     const reminder = reminderFields(input.reminder_mode, input.deadline, input.reminder_settings);
     const { data, error } = await supabase
       .from("tasks")
-      .insert({ ...input, ...reminder, company_id: auth.user.companyId, created_by: auth.user.id })
+      .insert({ ...input, ...reminder, company_id: auth.user.companyId, created_by: auth.user.id, drive_folder_id: assignedFolderId, drive_folder_name: assignedFolderName })
       .select()
       .single();
     if (error) throw error;
     after(async () => {
       const results = await Promise.allSettled([
-        createTaskDriveFolder(data.id, data.title, data.created_at, data.responsible_id, auth.user.companyId!),
+        assignedFolderId ? Promise.resolve() : createTaskDriveFolder(data.id, data.title, data.created_at, data.responsible_id, auth.user.companyId!),
         writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.created", entityType: "task", entityId: data.id, metadata: { title: data.title } }),
         syncTaskReminders(data.id),
       ]);

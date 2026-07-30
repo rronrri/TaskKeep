@@ -37,6 +37,8 @@ export interface Task {
   next_reminder_at: string | null;
   reminder_settings: ReminderSettings;
   folder_id: string | null;
+  drive_folder_id?: string | null;
+  drive_folder_name?: string | null;
   created_at: string;
   responsible?: { full_name: string; email: string } | null;
 }

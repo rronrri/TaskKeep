@@ -7,6 +7,7 @@ import { reminderFields } from "@/lib/tasks/reminders";
 import { cancelTaskReminders, syncTaskReminders } from "@/lib/tasks/schedule-reminders";
 import { resolveTeamIds } from "@/lib/tasks/team-scope";
 import { resolveDriveOwner } from "@/lib/google-drive/resolve-owner";
+import { verifyDriveFolder } from "@/lib/google-drive";
 import type { SessionUser } from "@/types";
 
 type Context = { params: Promise<{ id: string }> };
@@ -90,6 +91,9 @@ async function applyTaskUpdate(request: Request, user: SessionUser, id: string) 
       : input;
     const supabase = createAdminClient();
     if (auth.user.role === "collaborator") {
+      // Solo gestores/as asignan carpeta de Drive, y siempre validada contra el
+      // Picker: un/a colaborador/a no puede escribir un id de carpeta a mano.
+      delete normalized.drive_folder_id;
       const { data: owned } = await supabase
         .from("tasks")
         .select("id,status")
@@ -152,6 +156,26 @@ async function applyTaskUpdate(request: Request, user: SessionUser, id: string) 
         return NextResponse.json({ error: "Responsable no válido" }, { status: 400 });
       }
     }
+    // Igual que al crear: si se asigna o cambia la carpeta de Drive de la tarea,
+    // se valida contra el Drive de quien resulte dueño/a (la persona responsable
+    // tras el cambio, si también se está reasignando).
+    let driveUpdate: { drive_folder_id: string | null; drive_folder_name: string | null } | undefined;
+    if (normalized.drive_folder_id !== undefined) {
+      if (!normalized.drive_folder_id) {
+        driveUpdate = { drive_folder_id: null, drive_folder_name: null };
+      } else {
+        const effectiveResponsible = normalized.responsible_id ?? existingTask.responsible_id;
+        const owner = await resolveDriveOwner(supabase, auth.user.companyId!, effectiveResponsible);
+        if (!owner) return NextResponse.json({ error: "Conecta Google Drive antes de asignar una carpeta" }, { status: 409 });
+        try {
+          const verified = await verifyDriveFolder(normalized.drive_folder_id, owner.ownerId);
+          driveUpdate = { drive_folder_id: verified.id, drive_folder_name: verified.name };
+        } catch {
+          return NextResponse.json({ error: "No se pudo validar la carpeta de Google Drive elegida" }, { status: 400 });
+        }
+      }
+    }
+    delete normalized.drive_folder_id;
     if (normalized.status) {
       const { data, error } = await supabase.rpc("manager_update_task_status", {
         target_task_id: id,
@@ -160,7 +184,7 @@ async function applyTaskUpdate(request: Request, user: SessionUser, id: string) 
         next_status: normalized.status,
       });
       if (error) throw error;
-      const rest = { ...normalized };
+      const rest = { ...normalized, ...driveUpdate };
       delete rest.status;
       if (Object.keys(rest).length === 0) {
         defer("registrar el estado en auditoría", () => writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.status_updated", entityType: "task", entityId: id, metadata: { status: normalized.status } }));
@@ -180,7 +204,7 @@ async function applyTaskUpdate(request: Request, user: SessionUser, id: string) 
     }
     const { data, error } = await supabase
       .from("tasks")
-      .update({ ...normalized, updated_at: new Date().toISOString() })
+      .update({ ...normalized, ...driveUpdate, updated_at: new Date().toISOString() })
       .eq("id", id)
       .eq("company_id", auth.user.companyId!)
       .is("deleted_at", null)

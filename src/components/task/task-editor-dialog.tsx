@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { BellRing, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BellRing, FolderOpen, Plus, Trash2 } from "lucide-react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -129,16 +129,75 @@ export function TaskEditorDialog({
   const deadlineOffsets = useWatch({ control, name: "deadline_offsets" }) ?? [];
   const remindersOnly = mode === "reminders" && Boolean(task);
 
+  const [driveFolderId, setDriveFolderId] = useState("");
+  const [driveFolderName, setDriveFolderName] = useState("");
+  const [driveError, setDriveError] = useState("");
+  const [openingPicker, setOpeningPicker] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   useEffect(() => {
     if (!open) return;
     reset(task ? valuesFromTask(task) : defaultValues(actorRole, currentUserId));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDriveFolderId(task?.drive_folder_id ?? "");
+    setDriveFolderName(task?.drive_folder_name ?? "");
+    setDriveError("");
   }, [actorRole, currentUserId, open, reset, task]);
+
+  const openDrivePicker = async () => {
+    setDriveError("");
+    setOpeningPicker(true);
+    try {
+      await loadScript("https://apis.google.com/js/api.js");
+      await new Promise<void>((resolve) => window.gapi.load("picker", { callback: resolve }));
+      const [configResponse, tokenResponse] = await Promise.all([
+        fetch("/api/google/picker-config", { cache: "no-store" }),
+        fetch("/api/google/access-token", { cache: "no-store" }),
+      ]);
+      const configBody = await configResponse.json();
+      const tokenBody = await tokenResponse.json();
+      if (!configResponse.ok) throw new Error(configBody.error ?? "Google Picker no esta configurado");
+      if (!tokenResponse.ok) throw new Error(tokenBody.error ?? "Conecta Google Drive desde tu perfil primero");
+      const folderView = new window.google.picker.DocsView(window.google.picker.ViewId.FOLDERS)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(true)
+        .setMimeTypes("application/vnd.google-apps.folder");
+      const picker = new window.google.picker.PickerBuilder()
+        .setAppId(configBody.appId)
+        .setDeveloperKey(configBody.apiKey)
+        .setOAuthToken(tokenBody.access_token)
+        .addView(folderView)
+        .setTitle("Elige la carpeta de Drive para esta tarea")
+        .setCallback((data: PickerResponse) => {
+          if (data.action === window.google.picker.Action.PICKED) {
+            const folder = data.docs?.[0];
+            if (folder?.id) {
+              setDriveFolderId(folder.id);
+              setDriveFolderName(folder.name ?? "Carpeta seleccionada");
+            }
+          }
+          if (data.action === window.google.picker.Action.PICKED || data.action === window.google.picker.Action.CANCEL) {
+            setPickerOpen(false);
+          }
+        })
+        .build();
+      setPickerOpen(true);
+      picker.setVisible(true);
+    } catch (reason) {
+      setPickerOpen(false);
+      setDriveError(reason instanceof Error ? reason.message : "No se pudo abrir Google Picker");
+    } finally {
+      setOpeningPicker(false);
+    }
+  };
 
   const submit = async (values: Input) => {
     if (actorRole === "manager" && !z.string().uuid().safeParse(values.responsible_id).success) {
       setError("responsible_id", { message: "Selecciona un/a responsable" });
       return;
     }
+    const originalDriveFolderId = task?.drive_folder_id ?? "";
+    const driveFolderChanged = driveFolderId !== originalDriveFolderId;
     const response = await fetch(task ? `/api/tasks/${task.id}` : "/api/tasks", {
       method: task ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
@@ -152,6 +211,9 @@ export function TaskEditorDialog({
         reminder_settings: buildReminderSettings(values),
         deadline: values.reminder_mode === "deadline" && values.deadline ? new Date(values.deadline).toISOString() : null,
         folder_id: task ? undefined : initialFolderId,
+        drive_folder_id: task
+          ? (driveFolderChanged ? (driveFolderId || null) : undefined)
+          : (driveFolderId || undefined),
       }),
     });
     const body = await response.json();
@@ -182,6 +244,9 @@ export function TaskEditorDialog({
       description={dialogDescription}
       size="lg"
       scrollable={false}
+      modal={!pickerOpen}
+      onPointerDownOutside={(event) => { if (pickerOpen) event.preventDefault(); }}
+      onInteractOutside={(event) => { if (pickerOpen) event.preventDefault(); }}
     >
       <form onSubmit={handleSubmit(submit)} className="grid gap-3" noValidate>
         {remindersOnly && (
@@ -208,6 +273,26 @@ export function TaskEditorDialog({
             </Field>
           ) : <input type="hidden" {...register("responsible_id")} />}
         </div>
+
+        {actorRole === "manager" && (
+          <Field label="Carpeta de Google Drive (opcional)">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="input flex-1 !py-2 text-sm text-[var(--ink-soft)]">
+                {driveFolderName || "Se creara una carpeta automatica para la tarea"}
+              </div>
+              <button type="button" disabled={openingPicker} onClick={() => void openDrivePicker()} className="btn btn-ghost !px-3 !py-2 text-sm">
+                <FolderOpen size={16} />
+                {openingPicker ? "Abriendo..." : "Elegir"}
+              </button>
+              {driveFolderId && (
+                <button type="button" onClick={() => { setDriveFolderId(""); setDriveFolderName(""); }} className="btn btn-ghost !px-2 !py-2 text-sm !text-[var(--stamp-red)]">
+                  Quitar
+                </button>
+              )}
+            </div>
+            {driveError && <p className="mt-1 text-xs font-semibold text-[var(--stamp-red)]">{driveError}</p>}
+          </Field>
+        )}
 
         <Field label="Descripcion" error={errors.description?.message}>
           <textarea {...register("description")} rows={2} className="input resize-none !py-2" />
@@ -428,4 +513,19 @@ function toLocalDateTime(value: string) {
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
+
+function loadScript(src: string) {
+  return new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) return resolve();
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("No se pudo cargar Google Picker"));
+    document.body.appendChild(script);
+  });
+}
+
+type PickerResponse = { action: string; docs?: Array<{ id: string; name?: string }> };
 
