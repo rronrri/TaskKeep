@@ -533,3 +533,29 @@ function loadScript(src: string) {
 
 type PickerResponse = { action: string; docs?: Array<{ id: string; name?: string }> };
 
+declare global {
+  interface Window {
+    gapi: { load: (name: string, options: { callback: () => void }) => void };
+    google: {
+      picker: {
+        Action: { PICKED: string; CANCEL: string };
+        ViewId: { FOLDERS: string };
+        DocsView: new (viewId: string) => {
+          setIncludeFolders: (value: boolean) => Window["google"]["picker"]["DocsView"]["prototype"];
+          setSelectFolderEnabled: (value: boolean) => Window["google"]["picker"]["DocsView"]["prototype"];
+          setMimeTypes: (value: string) => Window["google"]["picker"]["DocsView"]["prototype"];
+        };
+        PickerBuilder: new () => {
+          setAppId: (value: string) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
+          setDeveloperKey: (value: string) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
+          setOAuthToken: (value: string) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
+          addView: (value: unknown) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
+          setTitle: (value: string) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
+          setCallback: (callback: (data: PickerResponse) => void) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
+          build: () => { setVisible: (value: boolean) => void };
+        };
+      };
+    };
+  }
+}
+
