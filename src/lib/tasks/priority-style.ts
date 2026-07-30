@@ -31,10 +31,12 @@ export const priorityStyles: Record<
 };
 
 // Semáforo del estado de una tarea: pendiente (ámbar), en curso (azul de la
-// marca) y completada (verde), reusando los mismos tokens de color que ya
-// existen para prioridad/stamps en globals.css.
-export const statusSelectStyles: Record<TaskStatus, string> = {
-  pending: "!border-[var(--prio-medium)] !bg-[var(--prio-medium-wash)] !text-[var(--prio-medium)]",
-  in_progress: "!border-[var(--primary)] !bg-[var(--primary-wash)] !text-[var(--primary)]",
-  completed: "!border-[var(--prio-low)] !bg-[var(--prio-low-wash)] !text-[var(--prio-low)]",
+// marca) y completada (verde). Es un stamp de solo lectura (mismo patrón que
+// ya usa el tablero de colaborador/a) al lado del select, no un color en el
+// propio <select> -el navegador no siempre respeta bien el estilo de fondo
+// de un control nativo, así que no era confiable.
+export const statusStamps: Record<TaskStatus, string> = {
+  pending: "stamp stamp-medium",
+  in_progress: "stamp stamp-primary",
+  completed: "stamp stamp-success",
 };
