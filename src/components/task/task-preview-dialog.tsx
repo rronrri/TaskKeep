@@ -294,7 +294,7 @@ export function TaskPreviewDialog({
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--primary)] bg-[var(--primary-wash)] p-4">
                 <div>
                   <p className="text-sm font-bold text-[var(--ink)]">Destino en Google Drive</p>
-                  <p className="mt-1 text-xs text-[var(--ink-soft)]">{destinationFolderName ? `Seleccionado: ${destinationFolderName}` : detail.capabilities.taskFolderName ? `Si no eliges una carpeta, se guardara en "${detail.capabilities.taskFolderName}".` : "Si no eliges una carpeta, se creara una carpeta nueva para esta tarea."}</p>
+                  <p className="mt-1 text-xs text-[var(--ink-soft)]">{destinationFolderName ? `Seleccionado: ${destinationFolderName}` : `Si no eliges una carpeta, se guardara en "${detail.capabilities.taskFolderName}".`}</p>
                 </div>
                 <button type="button" disabled={openingPicker || busy} onClick={() => void openDrivePicker()} className="btn btn-ghost !px-3 !py-2 text-sm !text-[var(--primary)]">
                   <FolderOpen size={17} />

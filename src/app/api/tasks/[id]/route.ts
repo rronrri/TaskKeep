@@ -7,7 +7,7 @@ import { reminderFields } from "@/lib/tasks/reminders";
 import { cancelTaskReminders, syncTaskReminders } from "@/lib/tasks/schedule-reminders";
 import { resolveTeamIds } from "@/lib/tasks/team-scope";
 import { resolveDriveOwner } from "@/lib/google-drive/resolve-owner";
-import { verifyDriveFolder } from "@/lib/google-drive";
+import { buildTaskFolderName, verifyDriveFolder } from "@/lib/google-drive";
 import type { SessionUser } from "@/types";
 
 type Context = { params: Promise<{ id: string }> };
@@ -61,7 +61,10 @@ export async function GET(_: Request, context: Context) {
         currentUserId: auth.user.id,
         driveConfigured: Boolean(driveOwner),
         taskFolderId: task.drive_folder_id ?? null,
-        taskFolderName: task.drive_folder_name ?? null,
+        // Aunque la carpeta todavía no exista en Drive (se crea recién al
+        // primer uso), el nombre que le tocará ya es predecible: se muestra
+        // igual para que la interfaz nunca sea vaga sobre a dónde va a ir.
+        taskFolderName: task.drive_folder_name ?? buildTaskFolderName(task.title, task.created_at),
         isOwnTask: task.created_by === auth.user.id && task.responsible_id === auth.user.id,
       },
     });
