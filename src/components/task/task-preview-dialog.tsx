@@ -130,7 +130,10 @@ export function TaskPreviewDialog({
     >
       <div className={`card ${priority.card} p-5`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className={priority.badge}>{priority.label}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={priority.badge}>{priority.label}</span>
+            <span className={statusStamps[task.status]}>{statusLabels[task.status]}</span>
+          </div>
           {task.is_pinned && <span className="flex items-center gap-1 text-xs font-bold"><Pin size={15} /> Fijada</span>}
         </div>
         <p className="mt-5 whitespace-pre-wrap text-sm leading-6 text-[var(--ink-soft)]">{task.description || "Sin descripción."}</p>
@@ -143,7 +146,7 @@ export function TaskPreviewDialog({
 
       {role === "manager" && (
         <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto]">
-          <label className="text-sm font-bold">Estado <span className={statusStamps[task.status]}>{statusLabels[task.status]}</span><select value={task.status} onChange={(event) => onStatusChange?.(task, event.target.value as TaskStatus)} className="input mt-2 !py-2.5"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></label>
+          <label className="text-sm font-bold">Estado<select value={task.status} onChange={(event) => onStatusChange?.(task, event.target.value as TaskStatus)} className="input mt-2 !py-2.5"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></label>
           <div className="flex flex-wrap items-end gap-2">
             <button onClick={() => onTogglePin?.(task)} className="btn btn-ghost !px-3 !py-2.5">{task.is_pinned ? <PinOff size={18} /> : <Pin size={18} />}{task.is_pinned ? "Desfijar" : "Fijar"}</button>
             <button onClick={() => onEdit?.(task)} className="btn btn-primary !px-3 !py-2.5"><Pencil size={18} /> Editar</button>

@@ -267,11 +267,11 @@ export function ManagerTaskBoard() {
               const priority = priorityStyles[task.priority];
               return (
                 <article key={task.id} draggable onContextMenu={(event) => openTaskMenu(event, task)} onDragStart={(event) => { event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} onClick={() => setPreview(task)} className={`card ${priority.card} cursor-grab p-3.5 active:cursor-grabbing`}>
-                  <div className="flex items-start justify-between gap-2"><span className={`shrink-0 ${priority.badge}`}>{priority.label}</span>{actions(task)}</div>
+                  <div className="flex items-start justify-between gap-2"><div className="flex flex-wrap items-center gap-1.5"><span className={`shrink-0 ${priority.badge}`}>{priority.label}</span><span className={`shrink-0 ${statusStamps[task.status]}`}>{statusLabels[task.status]}</span></div>{actions(task)}</div>
                   <div className="mt-2.5 block w-full text-left"><h2 className="font-display text-base font-bold hover:text-[var(--primary)]">{task.title}</h2>{task.description && <p className="mt-1.5 line-clamp-2 text-xs text-[var(--ink-soft)]">{task.description}</p>}</div>
                   <div className="mt-3 space-y-1.5"><p className={`folio flex items-center gap-2 ${overdue ? "!text-[var(--stamp-red)]" : ""}`}><CalendarClock size={15} />{formatDeadline(task.deadline)}{overdue && " · VENCIDA"}</p><p className="folio">Responsable · {task.responsible?.full_name ?? "Sin nombre"}</p></div>
                   <TaskTimingInfo task={task} compact />
-                  <label onClick={(event) => event.stopPropagation()} className="mt-3 block border-t border-[var(--line)] pt-3 text-xs font-bold uppercase tracking-wide">Estado <span className={`normal-case ${statusStamps[task.status]}`}>{statusLabels[task.status]}</span><select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="input mt-2 !py-2 text-sm normal-case"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></label>
+                  <label onClick={(event) => event.stopPropagation()} className="mt-3 block border-t border-[var(--line)] pt-3 text-xs font-bold uppercase tracking-wide">Estado<select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="input mt-2 !py-2 text-sm normal-case"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></label>
                 </article>
               );
             })}
@@ -283,10 +283,10 @@ export function ManagerTaskBoard() {
               <tbody className="divide-y divide-[var(--line)]">
                 {tasks.map((task) => { const priority = priorityStyles[task.priority]; return (
                   <tr key={task.id} draggable onContextMenu={(event) => openTaskMenu(event, task)} onDragStart={(event) => { event.dataTransfer.setData("application/x-taskkeep-task", task.id); event.dataTransfer.effectAllowed = "move"; }} onClick={() => setPreview(task)} className="cursor-grab hover:bg-[var(--paper)] active:cursor-grabbing">
-                    <td className="px-5 py-4"><div className="text-left"><p className="font-bold hover:text-[var(--primary)]">{task.title}</p><span className={`mt-1 inline-block ${priority.badge}`}>{priority.label}</span><TaskTimingInfo task={task} compact /></div></td>
+                    <td className="px-5 py-4"><div className="text-left"><p className="font-bold hover:text-[var(--primary)]">{task.title}</p><div className="mt-1 flex flex-wrap items-center gap-1.5"><span className={priority.badge}>{priority.label}</span><span className={statusStamps[task.status]}>{statusLabels[task.status]}</span></div><TaskTimingInfo task={task} compact /></div></td>
                     <td className="px-5 py-4">{task.responsible?.full_name ?? "Sin nombre"}</td>
                     <td className="folio px-5 py-4">{formatDeadline(task.deadline)}</td>
-                    <td className="px-5 py-4" onClick={(event) => event.stopPropagation()}><div className="flex flex-col items-start gap-1.5"><span className={statusStamps[task.status]}>{statusLabels[task.status]}</span><select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="input !w-auto !px-2 !py-1.5"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></div></td>
+                    <td className="px-5 py-4" onClick={(event) => event.stopPropagation()}><select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="input !w-auto !px-2 !py-1.5"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></td>
                     <td className="px-5 py-4"><div className="flex justify-end">{actions(task)}</div></td>
                   </tr>
                 ); })}
