@@ -53,10 +53,28 @@ export async function POST(request: Request) {
       // creada por la app o elegida con el Picker del mismo gestor/a dueño/a: el
       // alcance `drive.file` ya impide que apunte a cualquier otro lugar de su
       // cuenta, así que no hace falta validar un árbol de carpetas propio.
-      const targetFolder = selectedFolderId || (auth.user.role === "manager"
-        ? taskFolderId
-        : (await findOrCreateDriveFolder("Pendientes", taskFolderId, owner.ownerId)).id);
-      const drive = await uploadToDrive(file, targetFolder, owner.ownerId);
+      let drive: Awaited<ReturnType<typeof uploadToDrive>>;
+      let targetFolder: string;
+      try {
+        targetFolder = selectedFolderId || (auth.user.role === "manager"
+          ? taskFolderId
+          : (await findOrCreateDriveFolder("Pendientes", taskFolderId, owner.ownerId)).id);
+        drive = await uploadToDrive(file, targetFolder, owner.ownerId);
+      } catch (uploadError) {
+        // La carpeta guardada de la tarea ya no existe en Drive (se borró a mano,
+        // o cambió la cuenta conectada): no es una elección explícita del
+        // cliente, así que se recrea sola y se reintenta una vez antes de fallar.
+        if (selectedFolderId || !(uploadError instanceof Error) || !uploadError.message.includes("File not found")) {
+          throw uploadError;
+        }
+        const freshFolder = await createDriveFolder(buildTaskFolderName(task.title, task.created_at), "root", owner.ownerId);
+        taskFolderId = freshFolder.id;
+        await supabase.from("tasks").update({ drive_folder_id: taskFolderId, drive_folder_name: freshFolder.name }).eq("id", task.id);
+        targetFolder = auth.user.role === "manager"
+          ? taskFolderId
+          : (await findOrCreateDriveFolder("Pendientes", taskFolderId, owner.ownerId)).id;
+        drive = await uploadToDrive(file, targetFolder, owner.ownerId);
+      }
       const { data, error } = await supabase.from("task_files").insert({
         task_id: task.id,
         uploaded_by: auth.user.id,
@@ -82,7 +100,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ data }, { status: 201 });
     } catch (error) {
       if (error instanceof Error && error.message.includes("File not found")) {
-        return NextResponse.json({ error: "Google Drive no encuentra la carpeta configurada. Reconecta Google o vuelve a guardar una carpeta raíz accesible desde el perfil." }, { status: 400 });
+        return NextResponse.json({ error: "Google Drive no encuentra esa carpeta. Reconecta Google desde el perfil del/de la gestor/a o elige otra carpeta para la tarea." }, { status: 400 });
       }
       throw error;
     }

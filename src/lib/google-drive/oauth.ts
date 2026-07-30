@@ -11,8 +11,9 @@ import { createAdminClient } from "@/lib/supabase/server";
 // los tokens no caducan a los 7 días como ocurre con las apps en modo prueba que
 // piden alcances restringidos.
 //
-// Consecuencia de diseño: la carpeta raíz de la empresa debe seleccionarse con el
-// Picker (así queda autorizada). Pegar un enlace ya no basta, porque la app no
+// Consecuencia de diseño: cualquier carpeta que use la app (la de una tarea, o
+// una elegida a mano) tiene que seleccionarse con el Picker o crearse desde la
+// propia app; así queda autorizada. Pegar un enlace no basta, porque la app no
 // tendría permiso sobre esa carpeta.
 const scopes = [
   "https://www.googleapis.com/auth/drive.file",
