@@ -271,16 +271,17 @@ export function TaskPreviewDialog({
           </div>
         ) : (
           <div className="mt-4">
-            {/* El selector de carpetas usa un token de la cuenta de Google del/de
-                la gestor/a, así que solo se ofrece a quien conectó esa cuenta.
-                Los archivos de colaboradores/as van a "Pendientes" y es el/la
-                gestor/a quien elige el destino final al aprobarlos. */}
+            {/* El selector de carpetas usa el token de Google del/de la gestor/a
+                dueño/a del equipo de esta tarea, así que solo se ofrece a quien
+                es ese/a dueño/a. Los archivos de colaboradores/as van a
+                "Pendientes" y es el/la gestor/a quien elige el destino final al
+                aprobarlos. */}
             {role === "manager" && detail.capabilities.canUpload && !detail.capabilities.driveConfigured && (
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#9A7B24] bg-[#F3EDDC] p-4">
-                <p className="text-sm font-semibold text-[#6b5619]">Google Drive no esta configurado. Conecta tu cuenta y elige una carpeta raiz para poder subir archivos.</p>
-                <a href="/manager/profile?openDrive=1" className="btn btn-primary !px-3 !py-2 text-sm">
+                <p className="text-sm font-semibold text-[#6b5619]">Conecta tu Google Drive para poder subir archivos en tus tareas.</p>
+                <a href="/manager/profile" className="btn btn-primary !px-3 !py-2 text-sm">
                   <FolderOpen size={17} />
-                  Configurar Google Drive
+                  Conectar Google Drive
                 </a>
               </div>
             )}
@@ -349,4 +350,30 @@ function loadScript(src: string) {
 }
 
 type PickerResponse = { action: string; docs?: Array<{ id: string; name?: string }> };
+
+declare global {
+  interface Window {
+    gapi: { load: (name: string, options: { callback: () => void }) => void };
+    google: {
+      picker: {
+        Action: { PICKED: string; CANCEL: string };
+        ViewId: { FOLDERS: string };
+        DocsView: new (viewId: string) => {
+          setIncludeFolders: (value: boolean) => Window["google"]["picker"]["DocsView"]["prototype"];
+          setSelectFolderEnabled: (value: boolean) => Window["google"]["picker"]["DocsView"]["prototype"];
+          setMimeTypes: (value: string) => Window["google"]["picker"]["DocsView"]["prototype"];
+        };
+        PickerBuilder: new () => {
+          setAppId: (value: string) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
+          setDeveloperKey: (value: string) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
+          setOAuthToken: (value: string) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
+          addView: (value: unknown) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
+          setTitle: (value: string) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
+          setCallback: (callback: (data: PickerResponse) => void) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
+          build: () => { setVisible: (value: boolean) => void };
+        };
+      };
+    };
+  }
+}
 

@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
 import { getGoogleAccessToken } from "@/lib/google-drive/oauth";
+import { resolveDriveOwner } from "@/lib/google-drive/resolve-owner";
 import { createAdminClient } from "@/lib/supabase/server";
 
 type Context = { params: Promise<{ id: string }> };
 
-// Solo para gestores/as. El token devuelto es el de la cuenta de Google conectada
-// por el/la gestor/a (`drive_owner_user_id`) y llega hasta el navegador para que
-// Google Picker pueda operar. Entregárselo a un/a colaborador/a supondría darle
-// acceso directo a toda la cuenta de Drive de otra persona, así que este endpoint
-// solo lo emite para su propia cuenta: se exige que quien lo pide sea el/la
-// propietario/a de la conexión de Drive de la empresa.
+// Solo para gestores/as. El token devuelto es el de la cuenta de Google del/de
+// la gestor/a dueño/a del equipo de esta tarea (resuelto vía responsible_id) y
+// llega hasta el navegador para que Google Picker pueda operar. Entregárselo a
+// otra persona supondría darle acceso a la cuenta de Drive de otro/a gestor/a,
+// así que solo se emite para quien resulta ser ese/a dueño/a.
 export async function GET(_: Request, context: Context) {
   const auth = await requireApiUser(["manager"]);
   if (auth.error) return auth.error;
@@ -20,7 +20,7 @@ export async function GET(_: Request, context: Context) {
     const supabase = createAdminClient();
     const query = supabase
       .from("tasks")
-      .select("id,company:companies!inner(drive_folder_id,drive_owner_user_id)")
+      .select("id,responsible_id")
       .eq("id", id)
       .eq("company_id", auth.user.companyId!)
       .is("deleted_at", null);
@@ -29,13 +29,13 @@ export async function GET(_: Request, context: Context) {
     if (error) throw error;
     if (!task) return NextResponse.json({ error: "Tarea no encontrada o no asignada" }, { status: 404 });
 
-    const company = Array.isArray(task.company) ? task.company[0] : task.company;
-    if (!company?.drive_folder_id || !company.drive_owner_user_id) {
-      return NextResponse.json({ error: "El/la gestor/a debe conectar Google Drive y configurar una carpeta raiz" }, { status: 409 });
+    const owner = await resolveDriveOwner(supabase, auth.user.companyId!, task.responsible_id);
+    if (!owner) {
+      return NextResponse.json({ error: "El/la gestor/a debe conectar Google Drive" }, { status: 409 });
     }
-    if (company.drive_owner_user_id !== auth.user.id) {
+    if (owner.ownerId !== auth.user.id) {
       return NextResponse.json(
-        { error: "Solo quien conectó Google Drive en esta empresa puede abrir el selector de carpetas" },
+        { error: "Solo quien conectó Google Drive para este equipo puede abrir el selector de carpetas" },
         { status: 403 },
       );
     }

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { reviewStatusSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
 import { syncTaskReminders } from "@/lib/tasks/schedule-reminders";
+import { resolveTeamIds } from "@/lib/tasks/team-scope";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -13,7 +14,21 @@ export async function POST(request: Request, context: Context) {
   try {
     const { id } = await context.params;
     const input = reviewStatusSchema.parse(await request.json());
-    const { data, error } = await createAdminClient().rpc("review_status_request", {
+    const supabase = createAdminClient();
+    // La RPC solo acota por empresa; el equipo se comprueba antes de invocarla
+    // para que un/a gestor/a no pueda revisar solicitudes del equipo de otro/a.
+    const teamIds = await resolveTeamIds(supabase, auth.user.id, "manager");
+    const { data: request_ } = await supabase
+      .from("task_status_requests")
+      .select("id, task:tasks!inner(company_id,responsible_id)")
+      .eq("id", id)
+      .eq("task.company_id", auth.user.companyId!)
+      .maybeSingle();
+    const task = request_ && (Array.isArray(request_.task) ? request_.task[0] : request_.task);
+    if (!task || !teamIds.includes(task.responsible_id)) {
+      return NextResponse.json({ error: "Solicitud no encontrada" }, { status: 404 });
+    }
+    const { data, error } = await supabase.rpc("review_status_request", {
       request_id: id,
       reviewer_id: auth.user.id,
       reviewer_company_id: auth.user.companyId,

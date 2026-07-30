@@ -5,6 +5,8 @@ import { updateTaskSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
 import { reminderFields } from "@/lib/tasks/reminders";
 import { cancelTaskReminders, syncTaskReminders } from "@/lib/tasks/schedule-reminders";
+import { resolveTeamIds } from "@/lib/tasks/team-scope";
+import { resolveDriveOwner } from "@/lib/google-drive/resolve-owner";
 import type { SessionUser } from "@/types";
 
 type Context = { params: Promise<{ id: string }> };
@@ -17,11 +19,15 @@ export async function GET(_: Request, context: Context) {
     const supabase = createAdminClient();
     let taskQuery = supabase
       .from("tasks")
-      .select("*, responsible:users!tasks_responsible_id_fkey(full_name,email), company:companies!tasks_company_id_fkey(drive_folder_id,drive_owner_user_id)")
+      .select("*, responsible:users!tasks_responsible_id_fkey(full_name,email)")
       .eq("id", id)
       .is("deleted_at", null);
     if (auth.user.role !== "admin") taskQuery = taskQuery.eq("company_id", auth.user.companyId!);
     if (auth.user.role === "collaborator") taskQuery = taskQuery.eq("responsible_id", auth.user.id);
+    if (auth.user.role === "manager") {
+      const teamIds = await resolveTeamIds(supabase, auth.user.id, "manager");
+      taskQuery = taskQuery.in("responsible_id", teamIds);
+    }
     const { data: task, error: taskError } = await taskQuery.maybeSingle();
     if (taskError) throw taskError;
     if (!task) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
@@ -40,6 +46,7 @@ export async function GET(_: Request, context: Context) {
       filesQuery.order("created_at", { ascending: false }),
     ]);
     for (const result of [comments, logs, requests, files]) if (result.error) throw result.error;
+    const driveOwner = await resolveDriveOwner(supabase, task.company_id, task.responsible_id);
     return NextResponse.json({
       data: task,
       comments: comments.data ?? [],
@@ -51,7 +58,7 @@ export async function GET(_: Request, context: Context) {
         canUpload: auth.user.role === "manager" || auth.user.role === "collaborator",
         canReviewFiles: auth.user.role === "manager",
         currentUserId: auth.user.id,
-        driveConfigured: Boolean((Array.isArray(task.company) ? task.company[0] : task.company)?.drive_folder_id && (Array.isArray(task.company) ? task.company[0] : task.company)?.drive_owner_user_id),
+        driveConfigured: Boolean(driveOwner),
         taskFolderId: task.drive_folder_id ?? null,
         taskFolderName: task.drive_folder_name ?? null,
         isOwnTask: task.created_by === auth.user.id && task.responsible_id === auth.user.id,
@@ -117,6 +124,20 @@ async function applyTaskUpdate(request: Request, user: SessionUser, id: string) 
       defer("registrar la edición en auditoría", () => writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.updated", entityType: "task", entityId: id }));
       return NextResponse.json({ data });
     }
+    // El equipo del gestor/a (él/ella + sus colaboradores/as) acota qué tareas
+    // puede tocar y a quién puede reasignarlas: no ve ni edita el equipo de
+    // otro/a gestor/a de la misma empresa.
+    const teamIds = await resolveTeamIds(supabase, auth.user.id, "manager");
+    const { data: existingTask } = await supabase
+      .from("tasks")
+      .select("id,responsible_id")
+      .eq("id", id)
+      .eq("company_id", auth.user.companyId!)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!existingTask || !teamIds.includes(existingTask.responsible_id)) {
+      return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
+    }
     if (normalized.responsible_id) {
       const { data: responsible } = await supabase
         .from("users")
@@ -125,6 +146,7 @@ async function applyTaskUpdate(request: Request, user: SessionUser, id: string) 
         .eq("company_id", auth.user.companyId!)
         .eq("is_active", true)
         .is("deleted_at", null)
+        .in("id", teamIds)
         .maybeSingle();
       if (!responsible) {
         return NextResponse.json({ error: "Responsable no válido" }, { status: 400 });
@@ -177,7 +199,8 @@ export async function DELETE(_: Request, context: Context) {
   if (auth.error) return auth.error;
   const { id } = await context.params;
   const now = new Date().toISOString();
-  let query = createAdminClient()
+  const supabase = createAdminClient();
+  let query = supabase
     .from("tasks")
     .update({ deleted_at: now, updated_at: now })
     .eq("id", id)
@@ -185,9 +208,13 @@ export async function DELETE(_: Request, context: Context) {
   if (auth.user.role === "collaborator") {
     query = query.eq("created_by", auth.user.id).eq("responsible_id", auth.user.id);
   }
+  if (auth.user.role === "manager") {
+    const teamIds = await resolveTeamIds(supabase, auth.user.id, "manager");
+    query = query.in("responsible_id", teamIds);
+  }
   const { data, error } = await query.select("id").maybeSingle();
   if (error) return apiError(error);
-  if (!data) return NextResponse.json({ error: "Solo puedes eliminar tareas creadas por ti" }, { status: 403 });
+  if (!data) return NextResponse.json({ error: "No se puede eliminar esta tarea" }, { status: 403 });
   defer("finalizar la eliminación", async () => {
     const results = await Promise.allSettled([
       cancelTaskReminders(id),

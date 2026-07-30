@@ -4,7 +4,7 @@ Este documento resume lo necesario para configurar o cambiar la cuenta/proyecto 
 
 ## Qué necesita TaskKeep
 
-TaskKeep usa OAuth de Google para que cada gestor/a conecte su propia cuenta y configure una carpeta raíz de Drive para su empresa. Los colaboradores/as no conectan Google: heredan la carpeta configurada por el/la gestor/a.
+TaskKeep usa OAuth de Google para que cada gestor/a conecte su propia cuenta de Drive, independiente de la de otros/as gestores/as aunque compartan empresa. Los colaboradores/as no conectan Google: usan la conexión de quien los/las creó. No hay una carpeta raíz que configurar por separado: la carpeta de cada tarea se resuelve por su cuenta (ver "Cómo funciona en TaskKeep").
 
 Hay **un solo proyecto de Google Cloud y un solo cliente OAuth** para toda la
 aplicación: identifican a TaskKeep, no a las personas. Cada gestor/a autoriza
@@ -24,11 +24,11 @@ y `openid`). Es una decisión deliberada, no un detalle:
   está en pruebas los refresh tokens caducan a los 7 días, obligando a reconectar
   cada semana.
 
-Consecuencia práctica: **la carpeta raíz se elige con el selector de Google, no
-pegando un enlace.** Elegirla en el Picker es justamente lo que la autoriza para
-la aplicación. Del mismo modo, TaskKeep solo ve las subcarpetas que creó ella
-misma: una subcarpeta creada a mano desde Drive dentro de la carpeta de una tarea
-no aparecerá en el explorador de la aplicación.
+Consecuencia práctica: **cualquier carpeta que use TaskKeep se elige con el
+selector de Google, no pegando un enlace.** Elegirla en el Picker es justamente lo
+que la autoriza para la aplicación. Del mismo modo, TaskKeep solo ve las
+subcarpetas que creó ella misma: una subcarpeta creada a mano desde Drive dentro
+de la carpeta de una tarea no aparecerá en el explorador de la aplicación.
 
 Variables necesarias:
 
@@ -155,24 +155,32 @@ NEXT_PUBLIC_GOOGLE_APP_ID="1049985464679"
 
 1. El/la gestor/a inicia sesión.
 2. Si la contraseña es temporal, TaskKeep obliga a cambiarla.
-3. Desde **Mi perfil**, el/la gestor/a pulsa **Conectar Google**.
+3. Desde **Mi perfil**, el/la gestor/a pulsa **Conectar Google**. Cada gestor/a
+   conecta su propia cuenta: es independiente de la de otros/as gestores/as de la
+   misma empresa, no hay una carpeta ni una cuenta compartida.
 4. Google pide autorización. TaskKeep guarda el refresh token cifrado (AES-256-GCM)
-   asociado a esa persona.
-5. El/la gestor/a pulsa **Elegir carpeta** y selecciona la carpeta raíz con el
-   selector de Google. Esa selección es la que autoriza la carpeta para la app.
-6. TaskKeep comprueba el acceso y la guarda como carpeta de la empresa
-   (`drive_folder_id` y `drive_owner_user_id`).
-7. Cada tarea usa una carpeta propia, nombrada con la fecha de creación y el título:
+   asociado a esa persona (`users.google_refresh_token_encrypted`).
+5. No hay una carpeta raíz que configurar por separado: en cuanto la tarea necesita
+   Drive por primera vez (crearse, o subir el primer archivo), TaskKeep crea una
+   carpeta propia para esa tarea directo en "Mi unidad" de quien la posee, nombrada
+   con la fecha de creación y el título:
 
 ```text
 2026-07-30 - Nombre de la tarea
 ```
 
-8. Archivos de colaboradores/as:
+   Desde la tarea también se puede elegir con el selector de Google una carpeta
+   distinta para esa tarea en particular (útil si cada tarea debe ir a un lugar
+   distinto de Drive).
+6. "Quien posee" una tarea, es decir de qué gestor/a sale la conexión de Drive que
+   se usa: si la persona responsable de la tarea es un/a gestor/a, su propia
+   conexión; si es un/a colaborador/a, la conexión de quien lo/la creó
+   (`users.created_by`).
+7. Archivos de colaboradores/as:
    - Se suben a la carpeta `Pendientes`.
    - El/la gestor/a los aprueba o rechaza.
    - Al aprobar, se mueven a la carpeta principal de la tarea o a una subcarpeta elegida.
-9. Si se borra el último archivo de una tarea desde la propia tarea, TaskKeep borra
+8. Si se borra el último archivo de una tarea desde la propia tarea, TaskKeep borra
    también la carpeta que había creado para ella (para no dejar carpetas vacías en
    Drive). Si en cambio se borra la tarea completa, los archivos y la carpeta en
    Drive NO se tocan.
@@ -190,20 +198,20 @@ NEXT_PUBLIC_GOOGLE_APP_ID="nuevo-app-id"
 ```
 
 3. Reiniciar la aplicación.
-4. Cada gestor/a debe volver a pulsar **Reconectar Google** desde su perfil.
-5. Volver a elegir la carpeta raíz con el selector y guardar. Con `drive.file` la
-   autorización sobre la carpeta va ligada al cliente OAuth, así que un cliente
-   nuevo no hereda los permisos del anterior.
+4. Cada gestor/a debe volver a pulsar **Reconectar Google** desde su perfil. Con
+   `drive.file` la autorización sobre una carpeta va ligada al cliente OAuth, así
+   que un cliente nuevo no hereda los permisos del anterior: las tareas que ya
+   tenían carpeta asignada con el cliente viejo necesitarán elegir una carpeta
+   nueva desde la propia tarea.
 
 ## Si vienes de una versión con el alcance amplio
 
 Las empresas que configuraron su carpeta con el alcance `auth/drive` (pegando un
 enlace) dejarán de funcionar al cambiar a `drive.file`, porque la aplicación ya no
-tiene permiso sobre esa carpeta. Cada gestor/a debe:
-
-1. Entrar en **Mi perfil** y pulsar **Reconectar Google** (vuelve a pedir
-   consentimiento, ahora con el alcance nuevo).
-2. Pulsar **Elegir carpeta** y seleccionar la misma carpeta raíz de siempre.
+tiene permiso sobre esa carpeta. Cada gestor/a debe entrar en **Mi perfil** y
+pulsar **Reconectar Google** (vuelve a pedir consentimiento, ahora con el alcance
+nuevo); las tareas existentes necesitarán elegir una carpeta nueva desde la propia
+tarea la primera vez que se use Drive con ellas.
 
 Los archivos ya subidos siguen en Drive y no se tocan, pero TaskKeep solo podrá
 operar sobre las carpetas y archivos que cree a partir de ese momento.

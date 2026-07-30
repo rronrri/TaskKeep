@@ -22,7 +22,7 @@ export async function PATCH(request: Request, context: Context) {
       .eq("id", id)
       .is("deleted_at", null);
     if (auth.user.role === "manager") {
-      targetQuery = targetQuery.eq("company_id", auth.user.companyId!).eq("role", "collaborator");
+      targetQuery = targetQuery.eq("company_id", auth.user.companyId!).eq("role", "collaborator").eq("created_by", auth.user.id);
     } else {
       targetQuery = targetQuery.neq("role", "admin");
     }
@@ -58,7 +58,7 @@ export async function DELETE(_: Request, context: Context) {
   const supabase = createAdminClient();
   let query = supabase.from("users").select("id,company_id,full_name,email,role").eq("id", id).is("deleted_at", null);
   if (auth.user.role === "manager") {
-    query = query.eq("company_id", auth.user.companyId!).eq("role", "collaborator");
+    query = query.eq("company_id", auth.user.companyId!).eq("role", "collaborator").eq("created_by", auth.user.id);
   } else {
     query = query.neq("role", "admin");
   }

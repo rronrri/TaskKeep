@@ -3,6 +3,7 @@ import { z } from "zod";
 import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
+import { resolveTeamIds } from "@/lib/tasks/team-scope";
 
 type Context = { params: Promise<{ id: string }> };
 const moveSchema = z.object({ parent_id: z.string().uuid().nullable() });
@@ -14,7 +15,8 @@ export async function PATCH(request: Request, context: Context) {
     const { id } = await context.params;
     const { parent_id } = moveSchema.parse(await request.json());
     const supabase = createAdminClient();
-    const { data: allFolders, error: foldersError } = await supabase.from("task_folders").select("id,name,parent_id").eq("company_id", auth.user.companyId!);
+    const teamIds = await resolveTeamIds(supabase, auth.user.id, auth.user.role as "manager" | "collaborator");
+    const { data: allFolders, error: foldersError } = await supabase.from("task_folders").select("id,name,parent_id,created_by").eq("company_id", auth.user.companyId!).in("created_by", teamIds);
     if (foldersError) throw foldersError;
     const folder = (allFolders ?? []).find((item) => item.id === id);
     if (!folder) return NextResponse.json({ error: "Carpeta no encontrada" }, { status: 404 });

@@ -17,7 +17,10 @@ export async function GET(request: Request) {
     .neq("role", "admin")
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
-  if (auth.user.role === "manager") query = query.eq("company_id", auth.user.companyId!);
+  // Un/a gestor/a solo ve a los/las colaboradores/as que él/ella mismo/a creó,
+  // no a otros/as gestores/as ni a colaboradores/as de otro/a gestor/a de la
+  // misma empresa.
+  if (auth.user.role === "manager") query = query.eq("company_id", auth.user.companyId!).eq("role", "collaborator").eq("created_by", auth.user.id);
   if (url.searchParams.get("role")) query = query.eq("role", url.searchParams.get("role")!);
   if (url.searchParams.get("active") === "true") query = query.eq("is_active", true);
   if (url.searchParams.get("active") === "false") query = query.eq("is_active", false);

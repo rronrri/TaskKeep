@@ -4,6 +4,7 @@ import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { cancelRemindersForTasks } from "@/lib/tasks/schedule-reminders";
+import { resolveTeamIds } from "@/lib/tasks/team-scope";
 
 const folderSchema = z.object({ name: z.string().trim().min(1, "Escribe un nombre").max(80), parent_id: z.string().uuid().nullable().optional() });
 const deleteFolderSchema = z.object({ id: z.string().uuid() });
@@ -15,7 +16,11 @@ const restoreFolderSchema = z.object({
 export async function GET() {
   const auth = await requireApiUser(["manager", "collaborator"]);
   if (auth.error) return auth.error;
-  const { data, error } = await createAdminClient().from("task_folders").select("id,name,parent_id,created_by,created_at,updated_at").eq("company_id", auth.user.companyId!).order("name");
+  const supabase = createAdminClient();
+  // El equipo de quien pide (gestor/a + sus colaboradores/as) acota qué
+  // carpetas se ven: no las de otro/a gestor/a de la misma empresa.
+  const teamIds = await resolveTeamIds(supabase, auth.user.id, auth.user.role as "manager" | "collaborator");
+  const { data, error } = await supabase.from("task_folders").select("id,name,parent_id,created_by,created_at,updated_at").eq("company_id", auth.user.companyId!).in("created_by", teamIds).order("name");
   if (error) return apiError(error);
   return NextResponse.json({ data: data ?? [] });
 }
@@ -27,8 +32,11 @@ export async function POST(request: Request) {
     const input = folderSchema.parse(await request.json());
     const supabase = createAdminClient();
     if (input.parent_id) {
-      const { data: parent } = await supabase.from("task_folders").select("id").eq("id", input.parent_id).eq("company_id", auth.user.companyId!).maybeSingle();
-      if (!parent) return NextResponse.json({ error: "La carpeta superior no existe" }, { status: 404 });
+      const teamIds = await resolveTeamIds(supabase, auth.user.id, auth.user.role as "manager" | "collaborator");
+      const { data: parent } = await supabase.from("task_folders").select("id,created_by").eq("id", input.parent_id).eq("company_id", auth.user.companyId!).maybeSingle();
+      if (!parent || !parent.created_by || !teamIds.includes(parent.created_by)) {
+        return NextResponse.json({ error: "La carpeta superior no existe" }, { status: 404 });
+      }
     }
     const { data, error } = await supabase.from("task_folders").insert({ company_id: auth.user.companyId, parent_id: input.parent_id ?? null, created_by: auth.user.id, name: input.name }).select("id,name,parent_id,created_by,created_at,updated_at").single();
     if (error?.code === "23505") return NextResponse.json({ error: "Ya existe una carpeta con ese nombre en esta ubicacion" }, { status: 409 });
@@ -67,6 +75,13 @@ export async function PATCH(request: Request) {
           return NextResponse.json({ error: "Solo puedes restaurar carpetas creadas por ti" }, { status: 403 });
         }
       }
+      if (auth.user.role === "manager") {
+        const teamIds = await resolveTeamIds(supabase, auth.user.id, "manager");
+        const outOfTeam = (conflicting ?? []).find((row) => !row.created_by || !teamIds.includes(row.created_by));
+        if (outOfTeam) {
+          return NextResponse.json({ error: "Solo puedes restaurar carpetas de tu equipo" }, { status: 403 });
+        }
+      }
     }
 
     // Un/a colaborador/a solo restaura sus propias tareas.
@@ -86,12 +101,29 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: "Solo puedes restaurar tareas creadas por ti" }, { status: 403 });
       }
     }
+    // Un/a gestor/a solo restaura tareas de su equipo.
+    if (auth.user.role === "manager" && input.tasks.length > 0) {
+      const teamIds = await resolveTeamIds(supabase, auth.user.id, "manager");
+      const { data: taskRows, error: taskError } = await supabase
+        .from("tasks")
+        .select("id,responsible_id")
+        .eq("company_id", auth.user.companyId!)
+        .in("id", input.tasks.map((task) => task.id));
+      if (taskError) throw taskError;
+      const restorable = new Set((taskRows ?? []).filter((row) => teamIds.includes(row.responsible_id)).map((row) => row.id));
+      if (restorable.size !== input.tasks.length) {
+        return NextResponse.json({ error: "Solo puedes restaurar tareas de tu equipo" }, { status: 403 });
+      }
+    }
 
+    const managerTeamIds = auth.user.role === "manager" ? await resolveTeamIds(supabase, auth.user.id, "manager") : [];
     const folders = input.folders.map((folder) => ({
       id: folder.id,
       company_id: auth.user.companyId,
       parent_id: folder.parent_id,
-      created_by: auth.user.role === "collaborator" ? auth.user.id : folder.created_by ?? auth.user.id,
+      created_by: auth.user.role === "collaborator"
+        ? auth.user.id
+        : (folder.created_by && managerTeamIds.includes(folder.created_by) ? folder.created_by : auth.user.id),
       name: folder.name,
       created_at: folder.created_at,
       updated_at: new Date().toISOString(),
@@ -103,7 +135,8 @@ export async function PATCH(request: Request) {
     const restoreResults = await Promise.all(input.tasks.map(({ id, folder_id }) => supabase.from("tasks").update({ folder_id, deleted_at: null, updated_at: new Date().toISOString() }).eq("id", id).eq("company_id", auth.user.companyId!)));
     for (const result of restoreResults) if (result.error) throw result.error;
     await writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task_folder.restored", entityType: "task_folder", entityId: input.folders[0]?.id, metadata: { folders: input.folders.length, tasks: input.tasks.length } });
-    const { data } = await supabase.from("task_folders").select("id,name,parent_id,created_by,created_at,updated_at").eq("company_id", auth.user.companyId!).order("name");
+    const teamIdsForFetch = auth.user.role === "manager" ? managerTeamIds : await resolveTeamIds(supabase, auth.user.id, "collaborator");
+    const { data } = await supabase.from("task_folders").select("id,name,parent_id,created_by,created_at,updated_at").eq("company_id", auth.user.companyId!).in("created_by", teamIdsForFetch).order("name");
     return NextResponse.json({ data: data ?? [] });
   } catch (error) {
     return apiError(error);
@@ -126,8 +159,8 @@ export async function DELETE(request: Request) {
     if (tasksError) throw tasksError;
 
     // Eliminar una carpeta arrastra todas sus subcarpetas y archiva las tareas que
-    // contienen. Un/a colaborador/a solo puede hacerlo sobre lo que es suyo: sin
-    // esta comprobación podría archivar el trabajo de todo el equipo.
+    // contienen. Cada rol solo puede hacerlo sobre lo que es de su alcance: un/a
+    // colaborador/a sobre lo suyo, un/a gestor/a sobre lo de su equipo.
     if (auth.user.role === "collaborator") {
       const subtree = (allFolders ?? []).filter((item) => folderIds.includes(item.id));
       if (subtree.some((item) => item.created_by !== auth.user.id)) {
@@ -136,6 +169,19 @@ export async function DELETE(request: Request) {
       if ((taskRows ?? []).some((row) => row.created_by !== auth.user.id || row.responsible_id !== auth.user.id)) {
         return NextResponse.json(
           { error: "La carpeta contiene tareas de otras personas. Muévelas antes de eliminarla." },
+          { status: 409 },
+        );
+      }
+    }
+    if (auth.user.role === "manager") {
+      const teamIds = await resolveTeamIds(supabase, auth.user.id, "manager");
+      const subtree = (allFolders ?? []).filter((item) => folderIds.includes(item.id));
+      if (subtree.some((item) => !item.created_by || !teamIds.includes(item.created_by))) {
+        return NextResponse.json({ error: "Solo puedes eliminar carpetas de tu equipo" }, { status: 403 });
+      }
+      if ((taskRows ?? []).some((row) => !teamIds.includes(row.responsible_id))) {
+        return NextResponse.json(
+          { error: "La carpeta contiene tareas de otro equipo. Muévelas antes de eliminarla." },
           { status: 409 },
         );
       }

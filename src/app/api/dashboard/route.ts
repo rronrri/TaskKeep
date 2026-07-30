@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
+import { resolveTeamIds } from "@/lib/tasks/team-scope";
 
 export async function GET() {
   const auth = await requireApiUser();
@@ -34,13 +35,15 @@ export async function GET() {
       .eq("company_id", auth.user.companyId!)
       .is("deleted_at", null);
     if (auth.user.role === "collaborator") taskQuery = taskQuery.eq("responsible_id", auth.user.id);
+    const teamIds = auth.user.role === "manager" ? await resolveTeamIds(supabase, auth.user.id, "manager") : [];
+    if (auth.user.role === "manager") taskQuery = taskQuery.in("responsible_id", teamIds);
     const [tasksResult, requestsResult, fileRequestsResult] = await Promise.all([
       taskQuery.order("deadline", { ascending: true, nullsFirst: false }),
       auth.user.role === "manager"
-        ? supabase.from("task_status_requests").select("id,task:tasks!inner(company_id)").eq("task.company_id", auth.user.companyId!).eq("review_status", "pending_review")
+        ? supabase.from("task_status_requests").select("id,task:tasks!inner(company_id,responsible_id)").eq("task.company_id", auth.user.companyId!).eq("review_status", "pending_review").in("task.responsible_id", teamIds)
         : Promise.resolve({ data: [], error: null }),
       auth.user.role === "manager"
-        ? supabase.from("task_files").select("id,task:tasks!inner(company_id)").eq("task.company_id", auth.user.companyId!).eq("approval_status", "pending").is("deleted_at", null)
+        ? supabase.from("task_files").select("id,task:tasks!inner(company_id,responsible_id)").eq("task.company_id", auth.user.companyId!).eq("approval_status", "pending").is("deleted_at", null).in("task.responsible_id", teamIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
     if (tasksResult.error) throw tasksResult.error;

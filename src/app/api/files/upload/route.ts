@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
-import { assertFolderInCompanyTree, buildTaskFolderName, createDriveFolder, findOrCreateDriveFolder, uploadToDrive } from "@/lib/google-drive";
+import { buildTaskFolderName, createDriveFolder, findOrCreateDriveFolder, uploadToDrive } from "@/lib/google-drive";
+import { resolveDriveOwner } from "@/lib/google-drive/resolve-owner";
 import { createAdminClient } from "@/lib/supabase/server";
 import { protectMutation } from "@/lib/security";
 import { writeAudit } from "@/lib/audit";
+import { resolveTeamIds } from "@/lib/tasks/team-scope";
 
 const allowed = new Set(["application/pdf", "image/png", "image/jpeg", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
 
@@ -23,33 +25,38 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
     let taskQuery = supabase
       .from("tasks")
-      .select("id,title,created_at,drive_folder_id,company:companies!inner(id,drive_folder_id,drive_owner_user_id)")
+      .select("id,title,created_at,drive_folder_id,responsible_id")
       .eq("id", taskId)
       .eq("company_id", auth.user.companyId!)
       .is("deleted_at", null);
     if (auth.user.role === "collaborator") taskQuery = taskQuery.eq("responsible_id", auth.user.id);
+    if (auth.user.role === "manager") {
+      const teamIds = await resolveTeamIds(supabase, auth.user.id, "manager");
+      taskQuery = taskQuery.in("responsible_id", teamIds);
+    }
     const { data: task } = await taskQuery.maybeSingle();
     if (!task) return NextResponse.json({ error: "Tarea no encontrada o no asignada" }, { status: 404 });
-    const company = Array.isArray(task.company) ? task.company[0] : task.company;
-    if (!company?.drive_folder_id || !company.drive_owner_user_id) {
-      return NextResponse.json({ error: "El/la gestor/a debe conectar Google Drive y configurar una carpeta raíz" }, { status: 409 });
+    const owner = await resolveDriveOwner(supabase, auth.user.companyId!, task.responsible_id);
+    if (!owner) {
+      return NextResponse.json({ error: "El/la gestor/a debe conectar Google Drive" }, { status: 409 });
     }
     let taskFolderId = task.drive_folder_id;
     try {
       if (!taskFolderId) {
-        const taskFolder = await createDriveFolder(buildTaskFolderName(task.title, task.created_at), company.drive_folder_id, company.drive_owner_user_id);
+        // Sin carpeta raíz compartida: la carpeta de la tarea nace directo en la
+        // raíz de "Mi unidad" de quien la posee.
+        const taskFolder = await createDriveFolder(buildTaskFolderName(task.title, task.created_at), "root", owner.ownerId);
         taskFolderId = taskFolder.id;
         await supabase.from("tasks").update({ drive_folder_id: taskFolderId, drive_folder_name: taskFolder.name }).eq("id", task.id);
       }
-      if (selectedFolderId) {
-        // La carpeta la elige el cliente: sin esta comprobación el archivo podría
-        // acabar en cualquier punto del Drive de quien conectó la cuenta.
-        await assertFolderInCompanyTree(selectedFolderId, company.drive_folder_id, company.drive_owner_user_id);
-      }
+      // El destino, elegido o no por el cliente, siempre sale de una carpeta ya
+      // creada por la app o elegida con el Picker del mismo gestor/a dueño/a: el
+      // alcance `drive.file` ya impide que apunte a cualquier otro lugar de su
+      // cuenta, así que no hace falta validar un árbol de carpetas propio.
       const targetFolder = selectedFolderId || (auth.user.role === "manager"
         ? taskFolderId
-        : (await findOrCreateDriveFolder("Pendientes", taskFolderId, company.drive_owner_user_id)).id);
-      const drive = await uploadToDrive(file, targetFolder, company.drive_owner_user_id);
+        : (await findOrCreateDriveFolder("Pendientes", taskFolderId, owner.ownerId)).id);
+      const drive = await uploadToDrive(file, targetFolder, owner.ownerId);
       const { data, error } = await supabase.from("task_files").insert({
         task_id: task.id,
         uploaded_by: auth.user.id,

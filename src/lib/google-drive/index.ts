@@ -5,10 +5,6 @@ export { DriveFolderNotAllowedError };
 
 const folderMime = "application/vnd.google-apps.folder";
 
-// Profundidad máxima al subir por la cadena de `parents` buscando la carpeta raíz
-// de la empresa. Evita bucles y peticiones sin fin ante jerarquías inesperadas.
-const MAX_TREE_DEPTH = 25;
-
 export function isDriveConfigured() {
   return isGoogleOAuthConfigured();
 }
@@ -38,41 +34,6 @@ function requireDriveId(value: unknown, label = "carpeta") {
     throw new DriveFolderNotAllowedError(`El identificador de ${label} de Google Drive no es válido`);
   }
   return value;
-}
-
-/**
- * Comprueba que `folderId` sea la carpeta raíz de la empresa o una descendiente
- * suya, subiendo por la cadena de `parents`.
- *
- * Es la única defensa contra que un identificador enviado por el cliente apunte a
- * cualquier otra carpeta del Drive de la persona propietaria: todas las
- * operaciones se ejecutan con su token, así que sin esta comprobación el alcance
- * efectivo sería su cuenta entera. Debe llamarse ANTES de subir, mover, listar o
- * crear sobre cualquier identificador de origen externo.
- */
-export async function assertFolderInCompanyTree(folderId: string, companyRootId: string, ownerId: string) {
-  requireDriveId(folderId);
-  requireDriveId(companyRootId, "carpeta raíz");
-  if (folderId === companyRootId) return;
-
-  const visited = new Set<string>([folderId]);
-  let currentId = folderId;
-
-  for (let depth = 0; depth < MAX_TREE_DEPTH; depth += 1) {
-    const current = await driveFetch(
-      `files/${encodeURIComponent(currentId)}?fields=id,parents&supportsAllDrives=true`,
-      ownerId,
-    );
-    const parents = (current.parents ?? []) as string[];
-    if (parents.includes(companyRootId)) return;
-
-    const next = parents.find((parent) => isValidDriveId(parent) && !visited.has(parent));
-    if (!next) break;
-    visited.add(next);
-    currentId = next;
-  }
-
-  throw new DriveFolderNotAllowedError();
 }
 
 async function driveFetch(path: string, ownerId: string, init: RequestInit = {}) {

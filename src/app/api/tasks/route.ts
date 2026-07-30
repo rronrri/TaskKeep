@@ -6,6 +6,8 @@ import { writeAudit } from "@/lib/audit";
 import { reminderFields } from "@/lib/tasks/reminders";
 import { syncTaskReminders } from "@/lib/tasks/schedule-reminders";
 import { buildTaskFolderName, createDriveFolder } from "@/lib/google-drive";
+import { resolveDriveOwner } from "@/lib/google-drive/resolve-owner";
+import { resolveTeamIds } from "@/lib/tasks/team-scope";
 
 // Los parámetros llegan de la URL, así que hay que tolerar cualquier cosa: sin
 // esto, `?page=abc` produce un NaN que revienta el rango, y una fecha inválida
@@ -37,6 +39,10 @@ export async function GET(request: Request) {
       .is("deleted_at", null);
     if (auth.user.role !== "admin") query = query.eq("company_id", auth.user.companyId!);
     if (auth.user.role === "collaborator") query = query.eq("responsible_id", auth.user.id);
+    if (auth.user.role === "manager") {
+      const teamIds = await resolveTeamIds(supabase, auth.user.id, "manager");
+      query = query.in("responsible_id", teamIds);
+    }
     for (const key of ["status", "priority", "responsible_id"] as const) {
       const value = url.searchParams.get(key);
       if (value) query = query.eq(key, value);
@@ -81,6 +87,10 @@ export async function POST(request: Request) {
       ? { ...raw, responsible_id: auth.user.id, status: "pending", is_pinned: false }
       : raw);
     const supabase = createAdminClient();
+    // El equipo de quien crea (gestor/a + sus colaboradores/as, o el equipo de
+    // quien lo/la creó si es colaborador/a) acota tanto a quién se le puede
+    // asignar la tarea como en qué carpeta se puede archivar.
+    const teamIds = await resolveTeamIds(supabase, auth.user.id, auth.user.role as "manager" | "collaborator");
     const { data: responsible } = await supabase
       .from("users")
       .select("id")
@@ -88,17 +98,20 @@ export async function POST(request: Request) {
       .eq("company_id", auth.user.companyId!)
       .eq("is_active", true)
       .is("deleted_at", null)
+      .in("id", teamIds)
       .maybeSingle();
     if (!responsible) return NextResponse.json({ error: "Responsable no válido" }, { status: 400 });
     if (input.folder_id) {
       const { data: folder, error: folderError } = await supabase
         .from("task_folders")
-        .select("id")
+        .select("id,created_by")
         .eq("id", input.folder_id)
         .eq("company_id", auth.user.companyId!)
         .maybeSingle();
       if (folderError) throw folderError;
-      if (!folder) return NextResponse.json({ error: "Carpeta no encontrada" }, { status: 404 });
+      if (!folder || !folder.created_by || !teamIds.includes(folder.created_by)) {
+        return NextResponse.json({ error: "Carpeta no encontrada" }, { status: 404 });
+      }
     }
     const reminder = reminderFields(input.reminder_mode, input.deadline, input.reminder_settings);
     const { data, error } = await supabase
@@ -109,7 +122,7 @@ export async function POST(request: Request) {
     if (error) throw error;
     after(async () => {
       const results = await Promise.allSettled([
-        createTaskDriveFolder(data.id, data.title, data.created_at, auth.user.companyId!),
+        createTaskDriveFolder(data.id, data.title, data.created_at, data.responsible_id, auth.user.companyId!),
         writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.created", entityType: "task", entityId: data.id, metadata: { title: data.title } }),
         syncTaskReminders(data.id),
       ]);
@@ -121,16 +134,14 @@ export async function POST(request: Request) {
   }
 }
 
-async function createTaskDriveFolder(taskId: string, title: string, createdAt: string, companyId: string) {
+async function createTaskDriveFolder(taskId: string, title: string, createdAt: string, responsibleId: string, companyId: string) {
   const supabase = createAdminClient();
-  const { data: company, error } = await supabase
-    .from("companies")
-    .select("drive_folder_id,drive_owner_user_id")
-    .eq("id", companyId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!company?.drive_folder_id || !company.drive_owner_user_id) return;
-  const taskFolder = await createDriveFolder(buildTaskFolderName(title, createdAt), company.drive_folder_id, company.drive_owner_user_id);
+  const owner = await resolveDriveOwner(supabase, companyId, responsibleId);
+  if (!owner) return;
+  // Sin carpeta raíz compartida: cada tarea es una carpeta propia en la raíz
+  // de "Mi unidad" de quien la posee, para que puedan vivir en cualquier
+  // lugar sin depender de una jerarquía común entre gestores/as.
+  const taskFolder = await createDriveFolder(buildTaskFolderName(title, createdAt), "root", owner.ownerId);
   const { error: updateError } = await supabase.from("tasks").update({ drive_folder_id: taskFolder.id, drive_folder_name: taskFolder.name }).eq("id", taskId);
   if (updateError) throw updateError;
 }
