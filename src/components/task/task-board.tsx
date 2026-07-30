@@ -17,7 +17,7 @@ import type { Task, TaskFolder, TaskStatus, UserRole } from "@/types";
 
 const statusLabel: Record<TaskStatus, string> = { pending: "Pendiente", in_progress: "En curso", completed: "Completada" };
 const statusStamp: Record<TaskStatus, string> = {
-  pending: "stamp stamp-neutral",
+  pending: "stamp stamp-medium",
   in_progress: "stamp stamp-primary",
   completed: "stamp stamp-success",
 };
