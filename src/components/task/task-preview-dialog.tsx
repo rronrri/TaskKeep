@@ -56,8 +56,6 @@ export function TaskPreviewDialog({
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [reviewFile, setReviewFile] = useState<{ id: string; name: string; decision: "approved" | "rejected" } | null>(null);
-  const [reviewComment, setReviewComment] = useState("");
   const [destinationFolder, setDestinationFolder] = useState("");
   const [destinationFolderName, setDestinationFolderName] = useState("");
   const [openingPicker, setOpeningPicker] = useState(false);
@@ -184,33 +182,6 @@ export function TaskPreviewDialog({
     }
   };
 
-  const reviewUploadedFile = async () => {
-    if (!reviewFile) return;
-    setBusy(true);
-    setError("");
-    const response = await fetch(`/api/files/${reviewFile.id}/review`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision: reviewFile.decision, comment: reviewComment, drive_folder_id: destinationFolder || undefined }),
-    });
-    const body = await response.json();
-    setBusy(false);
-    if (!response.ok) {
-      setError(body.error ?? "No se pudo revisar el archivo");
-      return;
-    }
-    setDetail((current) => current ? {
-      ...current,
-      files: current.files.map((file) => file.id === reviewFile.id
-        ? { ...file, approval_status: reviewFile.decision, review_comment: reviewComment || null }
-        : file),
-    } : current);
-    setReviewFile(null);
-    setReviewComment("");
-    setDestinationFolder("");
-    setDestinationFolderName("");
-  };
-
   return (
     <AppDialog
       open
@@ -303,7 +274,6 @@ export function TaskPreviewDialog({
               </div>
             )}
             {detail.capabilities.canUpload && <div className="mb-4 rounded-md border border-dashed border-[var(--line-strong)] bg-[var(--paper)] p-4"><label className={`inline-flex items-center gap-2 rounded-md px-4 py-2.5 font-bold ${detail.capabilities.driveConfigured ? "bg-[var(--primary)] text-white" : "cursor-not-allowed bg-[var(--paper-deep)] text-[var(--line-strong)]"}`}><Upload size={18} /> Subir archivo<input type="file" className="hidden" disabled={!detail.capabilities.driveConfigured || busy} accept=".pdf,.png,.jpg,.jpeg,.txt,.docx" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); event.target.value = ""; }} /></label><p className="mt-2 text-xs text-[var(--ink-soft)]">{role === "collaborator" ? "Tu archivo quedará pendiente hasta que un/a gestor/a lo apruebe." : "Los archivos subidos por gestores/as quedan aprobados automáticamente."}</p>{!detail.capabilities.driveConfigured && role === "collaborator" && <p className="mt-2 text-xs font-semibold text-[#9A7B24]">El/la gestor/a debe conectar Google Drive y configurar una carpeta raíz desde su perfil.</p>}</div>}
-            {reviewFile && <div className={`mb-4 rounded-md border p-4 ${reviewFile.decision === "approved" ? "border-[#4A7058] bg-[#E9EFEA]" : "border-[var(--stamp-red)] bg-[var(--stamp-red-wash)]"}`}><p className="text-sm font-bold">{reviewFile.decision === "approved" ? "Aprobar" : "Rechazar"} &quot;{reviewFile.name}&quot;</p>{reviewFile.decision === "approved" && <div className="mt-3 rounded-md border border-[#4A7058] bg-[var(--surface)] p-3"><p className="text-sm font-bold">Guardar en Drive</p><p className="mt-1 text-xs text-[var(--ink-soft)]">{destinationFolderName ? `Seleccionado: ${destinationFolderName}` : "Si no eliges carpeta, se guardara en la carpeta principal de la tarea."}</p><button type="button" disabled={openingPicker || busy} onClick={() => void openDrivePicker()} className="btn btn-ghost mt-3 !px-3 !py-2 text-xs !text-[#4A7058]"><FolderOpen size={15} />{openingPicker ? "Abriendo Google..." : "Elegir carpeta"}</button></div>}<textarea value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} rows={2} placeholder="Comentario opcional para el pasante" className="input mt-3 resize-none !py-2 text-sm" /><div className="mt-3 flex justify-end gap-2"><button onClick={() => { setReviewFile(null); setReviewComment(""); setDestinationFolder(""); setDestinationFolderName(""); }} className="btn btn-ghost !px-3 !py-2 text-sm">Cancelar</button><button disabled={busy} onClick={() => void reviewUploadedFile()} className={`btn !px-3 !py-2 text-sm text-white ${reviewFile.decision === "approved" ? "!bg-[#4A7058] hover:!bg-[#3a5946]" : "btn-danger"}`}>Confirmar</button></div></div>}
             <div className="space-y-3">{detail.files.length === 0 ? <p className="rounded-md bg-[var(--paper)] p-4 text-sm text-[var(--ink-soft)]">No hay archivos adjuntos.</p> : detail.files.map((file) => {
               const canRemove = detail.capabilities.canReviewFiles || file.uploaded_by === detail.capabilities.currentUserId;
               return <article key={file.id} className="rounded-md border border-[var(--line)] p-3">
@@ -316,7 +286,6 @@ export function TaskPreviewDialog({
                   {canRemove && <button disabled={busy} onClick={() => void removeFile(file.id)} className="rounded-md p-2 text-[var(--stamp-red)] hover:bg-[var(--stamp-red-wash)]" aria-label={`Eliminar ${file.file_name}`}><Trash2 size={17} /></button>}
                 </div>
                 {file.review_comment && <p className="mt-2 rounded-md bg-[var(--paper)] px-3 py-2 text-xs text-[var(--ink-soft)]">Comentario de revisión: {file.review_comment}</p>}
-                {detail.capabilities.canReviewFiles && file.approval_status === "pending" && <div className="mt-3 flex justify-end gap-2 border-t border-[var(--line)] pt-3"><button onClick={() => { setReviewFile({ id: file.id, name: file.file_name, decision: "rejected" }); setReviewComment(""); setDestinationFolder(""); setDestinationFolderName(""); }} className="flex items-center gap-1 rounded-md border border-[var(--stamp-red)] px-3 py-2 text-xs font-bold text-[var(--stamp-red)] hover:bg-[var(--stamp-red-wash)]"><X size={15} /> Rechazar</button><button onClick={() => { setReviewFile({ id: file.id, name: file.file_name, decision: "approved" }); setReviewComment(""); setDestinationFolder(""); setDestinationFolderName(""); }} className="flex items-center gap-1 rounded-md bg-[#4A7058] px-3 py-2 text-xs font-bold text-white hover:bg-[#3a5946]"><Check size={15} /> Aprobar</button></div>}
               </article>;
             })}</div>
           </div>
