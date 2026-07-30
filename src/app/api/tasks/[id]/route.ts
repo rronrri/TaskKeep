@@ -7,7 +7,7 @@ import { reminderFields } from "@/lib/tasks/reminders";
 import { cancelTaskReminders, syncTaskReminders } from "@/lib/tasks/schedule-reminders";
 import { resolveTeamIds } from "@/lib/tasks/team-scope";
 import { resolveDriveOwner } from "@/lib/google-drive/resolve-owner";
-import { buildTaskFolderName, verifyDriveFolder } from "@/lib/google-drive";
+import { buildTaskFolderName, driveFileStatus, verifyDriveFolder } from "@/lib/google-drive";
 import type { SessionUser } from "@/types";
 
 type Context = { params: Promise<{ id: string }> };
@@ -34,7 +34,7 @@ export async function GET(_: Request, context: Context) {
     if (!task) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
     let filesQuery = supabase
       .from("task_files")
-      .select("id,uploaded_by,file_name,mime_type,file_size,drive_web_url,created_at,approval_status,review_comment,reviewed_at,uploader:users!task_files_uploaded_by_fkey(full_name,role),reviewer:users!task_files_reviewed_by_fkey(full_name)")
+      .select("id,drive_file_id,uploaded_by,file_name,mime_type,file_size,drive_web_url,created_at,approval_status,review_comment,reviewed_at,uploader:users!task_files_uploaded_by_fkey(full_name,role),reviewer:users!task_files_reviewed_by_fkey(full_name)")
       .eq("task_id", id)
       .is("deleted_at", null);
     if (auth.user.role === "collaborator") {
@@ -48,12 +48,26 @@ export async function GET(_: Request, context: Context) {
     ]);
     for (const result of [comments, logs, requests, files]) if (result.error) throw result.error;
     const driveOwner = await resolveDriveOwner(supabase, task.company_id, task.responsible_id);
+    // Si alguien borra el archivo directo en Drive (no desde TaskKeep), acá es
+    // donde se nota: se comprueba contra Drive y lo que ya no existe se marca
+    // borrado también en TaskKeep, para que ambos lados queden iguales.
+    let visibleFiles = files.data ?? [];
+    if (driveOwner && visibleFiles.length > 0) {
+      const statuses = await Promise.all(
+        visibleFiles.map((file) => driveFileStatus(file.drive_file_id, driveOwner.ownerId).catch(() => "unknown" as const)),
+      );
+      const missingIds = visibleFiles.filter((_, index) => statuses[index] === "missing").map((file) => file.id);
+      if (missingIds.length > 0) {
+        await supabase.from("task_files").update({ deleted_at: new Date().toISOString() }).in("id", missingIds);
+        visibleFiles = visibleFiles.filter((file) => !missingIds.includes(file.id));
+      }
+    }
     return NextResponse.json({
       data: task,
       comments: comments.data ?? [],
       history: logs.data ?? [],
       requests: requests.data ?? [],
-      files: files.data ?? [],
+      files: visibleFiles,
       capabilities: {
         canComment: auth.user.role === "manager" || auth.user.role === "collaborator",
         canUpload: auth.user.role === "manager" || auth.user.role === "collaborator",

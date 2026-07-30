@@ -98,6 +98,22 @@ export async function moveDriveFile(fileId: string, fromFolderId: string | null,
   return result as { id: string; webViewLink?: string };
 }
 
+/**
+ * Comprueba si un archivo sigue existiendo en Drive (por si alguien lo borró
+ * ahí directamente, sin pasar por TaskKeep). Solo devuelve "missing" ante un
+ * 404 explícito de Google; cualquier otro fallo (red, token) se trata como
+ * "unknown" para no marcar archivos como borrados por un error pasajero.
+ */
+export async function driveFileStatus(fileId: string, ownerId: string): Promise<"exists" | "missing" | "unknown"> {
+  try {
+    const result = await driveFetch(`files/${encodeURIComponent(fileId)}?fields=id,trashed&supportsAllDrives=true`, ownerId);
+    return result.trashed ? "missing" : "exists";
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("File not found")) return "missing";
+    return "unknown";
+  }
+}
+
 export async function deleteDriveFile(fileId: string, ownerId: string) {
   const token = await getGoogleAccessToken(ownerId);
   const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
