@@ -1,4 +1,4 @@
-import type { TaskPriority } from "@/types";
+import type { TaskPriority, TaskStatus } from "@/types";
 
 export const priorityStyles: Record<
   TaskPriority,
@@ -28,4 +28,13 @@ export const priorityStyles: Record<
     badge: "stamp stamp-critical",
     calendar: "#a5311f",
   },
+};
+
+// Semáforo del estado de una tarea: pendiente (ámbar), en curso (azul de la
+// marca) y completada (verde), reusando los mismos tokens de color que ya
+// existen para prioridad/stamps en globals.css.
+export const statusSelectStyles: Record<TaskStatus, string> = {
+  pending: "!border-[var(--prio-medium)] !bg-[var(--prio-medium-wash)] !text-[var(--prio-medium)]",
+  in_progress: "!border-[var(--primary)] !bg-[var(--primary-wash)] !text-[var(--primary)]",
+  completed: "!border-[var(--prio-low)] !bg-[var(--prio-low-wash)] !text-[var(--prio-low)]",
 };

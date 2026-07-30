@@ -6,7 +6,7 @@ import { format, isBefore } from "date-fns";
 import { es } from "date-fns/locale";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ToastMessages } from "@/components/ui/toast-message";
-import { priorityStyles } from "@/lib/tasks/priority-style";
+import { priorityStyles, statusSelectStyles } from "@/lib/tasks/priority-style";
 import { TaskEditorDialog, type ResponsibleOption } from "./task-editor-dialog";
 import { TaskPreviewDialog } from "./task-preview-dialog";
 import { TaskTimingInfo } from "./task-timing-info";
@@ -284,7 +284,7 @@ export function ManagerTaskBoard() {
                     <td className="px-5 py-4"><div className="text-left"><p className="font-bold hover:text-[var(--primary)]">{task.title}</p><span className={`mt-1 inline-block ${priority.badge}`}>{priority.label}</span><TaskTimingInfo task={task} compact /></div></td>
                     <td className="px-5 py-4">{task.responsible?.full_name ?? "Sin nombre"}</td>
                     <td className="folio px-5 py-4">{formatDeadline(task.deadline)}</td>
-                    <td className="px-5 py-4" onClick={(event) => event.stopPropagation()}><select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className="input !w-auto !px-2 !py-1.5"><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></td>
+                    <td className="px-5 py-4" onClick={(event) => event.stopPropagation()}><select value={task.status} onChange={(event) => void patchTask(task, { status: event.target.value as TaskStatus }, "Estado actualizado.")} className={`input !w-auto !px-2 !py-1.5 font-bold ${statusSelectStyles[task.status]}`}><option value="pending">Pendiente</option><option value="in_progress">En curso</option><option value="completed">Completada</option></select></td>
                     <td className="px-5 py-4"><div className="flex justify-end">{actions(task)}</div></td>
                   </tr>
                 ); })}
