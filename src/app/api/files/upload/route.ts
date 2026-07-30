@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
-import { assertFolderInCompanyTree, createDriveFolder, findOrCreateDriveFolder, uploadToDrive } from "@/lib/google-drive";
+import { assertFolderInCompanyTree, buildTaskFolderName, createDriveFolder, findOrCreateDriveFolder, uploadToDrive } from "@/lib/google-drive";
 import { createAdminClient } from "@/lib/supabase/server";
 import { protectMutation } from "@/lib/security";
 import { writeAudit } from "@/lib/audit";
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
     let taskQuery = supabase
       .from("tasks")
-      .select("id,title,drive_folder_id,company:companies!inner(id,drive_folder_id,drive_owner_user_id)")
+      .select("id,title,created_at,drive_folder_id,company:companies!inner(id,drive_folder_id,drive_owner_user_id)")
       .eq("id", taskId)
       .eq("company_id", auth.user.companyId!)
       .is("deleted_at", null);
@@ -37,9 +37,9 @@ export async function POST(request: Request) {
     let taskFolderId = task.drive_folder_id;
     try {
       if (!taskFolderId) {
-        const taskFolder = await createDriveFolder(taskFolderName(task.id, task.title), company.drive_folder_id, company.drive_owner_user_id);
+        const taskFolder = await createDriveFolder(buildTaskFolderName(task.title, task.created_at), company.drive_folder_id, company.drive_owner_user_id);
         taskFolderId = taskFolder.id;
-        await supabase.from("tasks").update({ drive_folder_id: taskFolderId }).eq("id", task.id);
+        await supabase.from("tasks").update({ drive_folder_id: taskFolderId, drive_folder_name: taskFolder.name }).eq("id", task.id);
       }
       if (selectedFolderId) {
         // La carpeta la elige el cliente: sin esta comprobación el archivo podría
@@ -82,8 +82,4 @@ export async function POST(request: Request) {
   } catch (error) {
     return apiError(error);
   }
-}
-
-function taskFolderName(id: string, title: string) {
-  return `TK-${id.slice(0, 8)} - ${title}`.slice(0, 120);
 }

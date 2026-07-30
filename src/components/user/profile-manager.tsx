@@ -11,7 +11,7 @@ import { Field } from "@/components/ui/field";
 import { profileSchema } from "@/lib/validators";
 
 type ProfileInput = z.infer<typeof profileSchema>;
-type CompanyMeta = { name: string; drive_folder_url?: string | null; drive_folder_id?: string | null; drive_connected_at?: string | null };
+type CompanyMeta = { name: string; drive_folder_url?: string | null; drive_folder_id?: string | null; drive_folder_name?: string | null; drive_connected_at?: string | null };
 type ProfileMeta = {
   id: string;
   full_name: string;
@@ -54,11 +54,13 @@ export function ProfileManager() {
         reset({ full_name: body.data.full_name, email: body.data.email, current_password: "", new_password: "" });
         setDriveLink(company?.drive_folder_url ?? "");
         setDriveFolderId(company?.drive_folder_id ?? "");
+        setDriveFolderName(company?.drive_folder_name ?? "");
         setMeta(body.data);
         if (body.data.must_change_password) setAccountModalOpen(true);
         const params = new URLSearchParams(window.location.search);
         if (params.get("google") === "connected") setNotice("Google Drive conectado. Ahora configura la carpeta raiz desde el boton de Drive.");
         if (params.get("google") === "error") setServerError(params.get("reason") ?? "No se pudo conectar Google Drive.");
+        if (params.get("openDrive") === "1") setDriveModalOpen(true);
       })
       .catch((reason: unknown) => setServerError(reason instanceof Error ? reason.message : "No se pudo cargar el perfil"));
   }, [reset]);
@@ -115,7 +117,7 @@ export function ProfileManager() {
     const response = await fetch("/api/profile/drive", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ drive_folder_id: driveFolderId, drive_folder_url: driveLink || undefined }),
+      body: JSON.stringify({ drive_folder_id: driveFolderId, drive_folder_url: driveLink || undefined, drive_folder_name: driveFolderName || undefined }),
     });
     const body = await response.json();
     setSavingDrive(false);
@@ -124,6 +126,7 @@ export function ProfileManager() {
       return;
     }
     setMeta((current) => current ? { ...current, company: body.data } : current);
+    setDriveFolderName(body.data.drive_folder_name ?? driveFolderName);
     setDriveModalOpen(false);
     setDriveSuccessOpen(true);
   };
@@ -233,7 +236,14 @@ export function ProfileManager() {
               </div>
             </div>
             <p className="mt-4 text-sm font-semibold text-[var(--ink)]">Estado: {meta.google_email ? `Conectado como ${meta.google_email}` : "Google no conectado"}</p>
-            <p className="mt-2 text-sm text-[var(--ink-soft)]">Carpeta: {company?.drive_folder_url ? "Configurada y validada" : "Aun no configurada"}</p>
+            <p className="mt-2 text-sm text-[var(--ink-soft)]">
+              Carpeta: {company?.drive_folder_id ? (
+                <>
+                  <span className="font-semibold text-[var(--ink)]">{company.drive_folder_name || "Configurada y validada"}</span>
+                  {company.drive_folder_url && <a href={company.drive_folder_url} target="_blank" rel="noreferrer" className="ml-2 underline">Abrir en Drive</a>}
+                </>
+              ) : "Aun no configurada"}
+            </p>
           </section>
         )}
       </div>

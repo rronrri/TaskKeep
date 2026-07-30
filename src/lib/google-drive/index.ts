@@ -14,6 +14,17 @@ export function isDriveConfigured() {
 }
 
 /**
+ * Nombre de la carpeta que el sistema crea por tarea: fecha de creación +
+ * título. Reemplaza el prefijo `TK-<hex>` anterior, que no decía nada al
+ * mirar la carpeta directamente en Drive.
+ */
+export function buildTaskFolderName(title: string, createdAt: string | Date) {
+  const date = new Date(createdAt);
+  const day = Number.isNaN(date.getTime()) ? new Date().toISOString().slice(0, 10) : date.toISOString().slice(0, 10);
+  return `${day} - ${title}`.slice(0, 120);
+}
+
+/**
  * Los identificadores de Google Drive son cadenas seguras para URL. Validamos el
  * formato antes de usarlos: impide inyectar sintaxis en las consultas `q` y
  * descarta de entrada cualquier valor manipulado.

@@ -123,7 +123,7 @@ Google Drive funciona por empresa:
 2. Pega el enlace de una carpeta raíz de Drive.
 3. TaskKeep valida el acceso y guarda esa carpeta en la empresa.
 4. Los colaboradores/as heredan esa carpeta automáticamente.
-5. Cada tarea crea una carpeta propia `TK-... - nombre de tarea`.
+5. Cada tarea crea una carpeta propia `AAAA-MM-DD - nombre de tarea`. Si se borra el último adjunto desde la tarea, esa carpeta se borra si queda vacía; borrar la tarea nunca toca Drive.
 6. Los archivos de colaboradores/as se suben a `Pendientes` y luego el/la gestor/a los aprueba o rechaza.
 7. Al aprobar, el archivo se mueve a la carpeta principal de la tarea o a una subcarpeta elegida.
 

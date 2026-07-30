@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
-import { assertFolderInCompanyTree, createDriveFolder, listDriveFolders } from "@/lib/google-drive";
+import { assertFolderInCompanyTree, buildTaskFolderName, createDriveFolder, listDriveFolders } from "@/lib/google-drive";
 import { createAdminClient } from "@/lib/supabase/server";
 
 type Context = { params: Promise<{ id: string }> };
@@ -13,7 +13,7 @@ export async function GET(request: Request, context: Context) {
     const supabase = createAdminClient();
     let query = supabase
       .from("tasks")
-      .select("id,title,drive_folder_id,company:companies!inner(drive_folder_id,drive_owner_user_id)")
+      .select("id,title,created_at,drive_folder_id,company:companies!inner(drive_folder_id,drive_owner_user_id)")
       .eq("id", id)
       .eq("company_id", auth.user.companyId!)
       .is("deleted_at", null);
@@ -26,9 +26,9 @@ export async function GET(request: Request, context: Context) {
     let taskFolderId = task.drive_folder_id;
     try {
       if (!taskFolderId && company.drive_folder_id) {
-        const folder = await createDriveFolder(taskFolderName(task.id, task.title), company.drive_folder_id, company.drive_owner_user_id);
+        const folder = await createDriveFolder(buildTaskFolderName(task.title, task.created_at), company.drive_folder_id, company.drive_owner_user_id);
         taskFolderId = folder.id;
-        await supabase.from("tasks").update({ drive_folder_id: taskFolderId }).eq("id", task.id);
+        await supabase.from("tasks").update({ drive_folder_id: taskFolderId, drive_folder_name: folder.name }).eq("id", task.id);
       }
     } catch (error) {
       if (error instanceof Error && error.message.includes("File not found")) {
@@ -79,7 +79,7 @@ export async function POST(request: Request, context: Context) {
     const supabase = createAdminClient();
     let query = supabase
       .from("tasks")
-      .select("id,title,drive_folder_id,company:companies!inner(drive_folder_id,drive_owner_user_id)")
+      .select("id,title,created_at,drive_folder_id,company:companies!inner(drive_folder_id,drive_owner_user_id)")
       .eq("id", id)
       .eq("company_id", auth.user.companyId!)
       .is("deleted_at", null);
@@ -93,9 +93,9 @@ export async function POST(request: Request, context: Context) {
     let taskFolderId = task.drive_folder_id;
     try {
       if (!taskFolderId) {
-        const folder = await createDriveFolder(taskFolderName(task.id, task.title), company.drive_folder_id, company.drive_owner_user_id);
+        const folder = await createDriveFolder(buildTaskFolderName(task.title, task.created_at), company.drive_folder_id, company.drive_owner_user_id);
         taskFolderId = folder.id;
-        await supabase.from("tasks").update({ drive_folder_id: taskFolderId }).eq("id", task.id);
+        await supabase.from("tasks").update({ drive_folder_id: taskFolderId, drive_folder_name: folder.name }).eq("id", task.id);
       }
       if (requestedParent) {
         await assertFolderInCompanyTree(requestedParent, company.drive_folder_id, company.drive_owner_user_id);
@@ -111,8 +111,4 @@ export async function POST(request: Request, context: Context) {
   } catch (error) {
     return apiError(error);
   }
-}
-
-function taskFolderName(id: string, title: string) {
-  return `TK-${id.slice(0, 8)} - ${title}`.slice(0, 120);
 }

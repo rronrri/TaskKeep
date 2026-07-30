@@ -52,6 +52,8 @@ export async function GET(_: Request, context: Context) {
         canReviewFiles: auth.user.role === "manager",
         currentUserId: auth.user.id,
         driveConfigured: Boolean((Array.isArray(task.company) ? task.company[0] : task.company)?.drive_folder_id && (Array.isArray(task.company) ? task.company[0] : task.company)?.drive_owner_user_id),
+        taskFolderId: task.drive_folder_id ?? null,
+        taskFolderName: task.drive_folder_name ?? null,
         isOwnTask: task.created_by === auth.user.id && task.responsible_id === auth.user.id,
       },
     });

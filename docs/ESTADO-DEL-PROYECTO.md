@@ -93,7 +93,7 @@ Todo lo siguiente está implementado y funcionando en producción:
 
 **Google Drive**
 - OAuth por empresa: el gestor/a conecta su cuenta y define una carpeta raíz; los colaboradores/as la heredan.
-- Cada tarea genera automáticamente su carpeta `TK-xxxxxxxx - título`.
+- Cada tarea genera automáticamente su carpeta `AAAA-MM-DD - título`. Si se borra el último adjunto desde la tarea, la carpeta vacía se borra también; borrar la tarea nunca toca Drive.
 - Subida de archivos con validación de tipo (PDF, PNG, JPEG, TXT, DOCX) y tamaño (10 MB).
 - Los archivos de colaboradores/as van a `Pendientes` y requieren aprobación; al aprobarse se mueven a la carpeta de la tarea o a una subcarpeta elegida.
 - Explorador de carpetas y creación de subcarpetas desde la interfaz, con Google Picker.

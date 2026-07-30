@@ -11,7 +11,7 @@ export async function GET() {
   if (auth.error) return auth.error;
   const { data, error } = await createAdminClient()
     .from("users")
-    .select("id,full_name,email,role,created_at,must_change_password,google_email,google_connected_at,company:companies!users_company_id_fkey(name,drive_folder_url,drive_folder_id,drive_connected_at)")
+    .select("id,full_name,email,role,created_at,must_change_password,google_email,google_connected_at,company:companies!users_company_id_fkey(name,drive_folder_url,drive_folder_id,drive_folder_name,drive_connected_at)")
     .eq("id", auth.user.id)
     .single();
   if (error) return apiError(error);
@@ -61,7 +61,7 @@ export async function PATCH(request: Request) {
       .from("users")
       .update(update)
       .eq("id", auth.user.id)
-      .select("id,company_id,full_name,email,role,created_at,must_change_password,google_email,google_connected_at,company:companies!users_company_id_fkey(name,drive_folder_url,drive_folder_id,drive_connected_at)")
+      .select("id,company_id,full_name,email,role,created_at,must_change_password,google_email,google_connected_at,company:companies!users_company_id_fkey(name,drive_folder_url,drive_folder_id,drive_folder_name,drive_connected_at)")
       .single();
     if (error) throw error;
 

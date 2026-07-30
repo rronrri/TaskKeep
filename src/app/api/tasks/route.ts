@@ -5,7 +5,7 @@ import { taskSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
 import { reminderFields } from "@/lib/tasks/reminders";
 import { syncTaskReminders } from "@/lib/tasks/schedule-reminders";
-import { createDriveFolder } from "@/lib/google-drive";
+import { buildTaskFolderName, createDriveFolder } from "@/lib/google-drive";
 
 // Los parámetros llegan de la URL, así que hay que tolerar cualquier cosa: sin
 // esto, `?page=abc` produce un NaN que revienta el rango, y una fecha inválida
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
     if (error) throw error;
     after(async () => {
       const results = await Promise.allSettled([
-        createTaskDriveFolder(data.id, data.title, auth.user.companyId!),
+        createTaskDriveFolder(data.id, data.title, data.created_at, auth.user.companyId!),
         writeAudit({ actorId: auth.user.id, companyId: auth.user.companyId, action: "task.created", entityType: "task", entityId: data.id, metadata: { title: data.title } }),
         syncTaskReminders(data.id),
       ]);
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
   }
 }
 
-async function createTaskDriveFolder(taskId: string, title: string, companyId: string) {
+async function createTaskDriveFolder(taskId: string, title: string, createdAt: string, companyId: string) {
   const supabase = createAdminClient();
   const { data: company, error } = await supabase
     .from("companies")
@@ -130,8 +130,8 @@ async function createTaskDriveFolder(taskId: string, title: string, companyId: s
     .maybeSingle();
   if (error) throw error;
   if (!company?.drive_folder_id || !company.drive_owner_user_id) return;
-  const taskFolder = await createDriveFolder(taskFolderName(taskId, title), company.drive_folder_id, company.drive_owner_user_id);
-  const { error: updateError } = await supabase.from("tasks").update({ drive_folder_id: taskFolder.id }).eq("id", taskId);
+  const taskFolder = await createDriveFolder(buildTaskFolderName(title, createdAt), company.drive_folder_id, company.drive_owner_user_id);
+  const { error: updateError } = await supabase.from("tasks").update({ drive_folder_id: taskFolder.id, drive_folder_name: taskFolder.name }).eq("id", taskId);
   if (updateError) throw updateError;
 }
 
@@ -141,6 +141,3 @@ function reportBackgroundFailures(context: string, results: PromiseSettledResult
   }
 }
 
-function taskFolderName(id: string, title: string) {
-  return `TK-${id.slice(0, 8)} - ${title}`.slice(0, 120);
-}

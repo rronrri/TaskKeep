@@ -162,16 +162,20 @@ NEXT_PUBLIC_GOOGLE_APP_ID="1049985464679"
    selector de Google. Esa selección es la que autoriza la carpeta para la app.
 6. TaskKeep comprueba el acceso y la guarda como carpeta de la empresa
    (`drive_folder_id` y `drive_owner_user_id`).
-7. Cada tarea usa una carpeta propia:
+7. Cada tarea usa una carpeta propia, nombrada con la fecha de creación y el título:
 
 ```text
-TK-xxxxxxxx - Nombre de la tarea
+2026-07-30 - Nombre de la tarea
 ```
 
 8. Archivos de colaboradores/as:
    - Se suben a la carpeta `Pendientes`.
    - El/la gestor/a los aprueba o rechaza.
    - Al aprobar, se mueven a la carpeta principal de la tarea o a una subcarpeta elegida.
+9. Si se borra el último archivo de una tarea desde la propia tarea, TaskKeep borra
+   también la carpeta que había creado para ella (para no dejar carpetas vacías en
+   Drive). Si en cambio se borra la tarea completa, los archivos y la carpeta en
+   Drive NO se tocan.
 
 ## Si se cambia la cuenta/proyecto de Google
 

@@ -12,6 +12,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 const schema = z.object({
   drive_folder_id: z.union([z.string().trim().min(10).max(200), z.literal("")]),
   drive_folder_url: z.string().url().optional().nullable(),
+  drive_folder_name: z.string().trim().min(1).max(200).optional(),
 });
 
 export async function PATCH(request: Request) {
@@ -25,6 +26,7 @@ export async function PATCH(request: Request) {
       await supabase.from("companies").update({
         drive_folder_id: null,
         drive_folder_url: null,
+        drive_folder_name: null,
         drive_owner_user_id: null,
         drive_connected_at: null,
       }).eq("id", auth.user.companyId!);
@@ -33,8 +35,9 @@ export async function PATCH(request: Request) {
       if (!isValidDriveId(folderId)) {
         return NextResponse.json({ error: "El identificador de carpeta de Google Drive no es válido" }, { status: 400 });
       }
+      let verified: { id: string; name: string; webViewLink: string };
       try {
-        await verifyDriveFolder(folderId, auth.user.id);
+        verified = await verifyDriveFolder(folderId, auth.user.id);
       } catch (error) {
         const detail = error instanceof Error ? error.message : "No se pudo validar la carpeta de Google Drive";
         // Con el alcance `drive.file`, "File not found" significa casi siempre que
@@ -46,7 +49,8 @@ export async function PATCH(request: Request) {
       }
       await supabase.from("companies").update({
         drive_folder_id: folderId,
-        drive_folder_url: input.drive_folder_url || `https://drive.google.com/drive/folders/${folderId}`,
+        drive_folder_url: input.drive_folder_url || verified.webViewLink || `https://drive.google.com/drive/folders/${folderId}`,
+        drive_folder_name: input.drive_folder_name || verified.name,
         drive_owner_user_id: auth.user.id,
         drive_connected_at: new Date().toISOString(),
       }).eq("id", auth.user.companyId!);
@@ -54,7 +58,7 @@ export async function PATCH(request: Request) {
 
     const { data, error } = await supabase
       .from("companies")
-      .select("name,drive_folder_url,drive_folder_id,drive_connected_at")
+      .select("name,drive_folder_url,drive_folder_id,drive_folder_name,drive_connected_at")
       .eq("id", auth.user.companyId!)
       .single();
     if (error) throw error;
