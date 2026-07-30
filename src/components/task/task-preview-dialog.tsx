@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarClock, Check, Clock3, FileText, FolderOpen, History, MessageSquare, Pencil, Pin, PinOff, Send, Trash2, Upload, UserRound, X } from "lucide-react";
 import { format, isBefore } from "date-fns";
 import { es } from "date-fns/locale";
@@ -62,10 +62,11 @@ export function TaskPreviewDialog({
   const [destinationFolderName, setDestinationFolderName] = useState("");
   const [openingPicker, setOpeningPicker] = useState(false);
   // Google Picker se inyecta fuera del portal de Radix: mientras está abierto,
-  // Radix lo trata como un clic fuera del diálogo y lo cierra solo. Se bloquea
-  // el cierre por fuera solo durante esa ventana, para no perder el clic afuera
-  // como forma normal de cerrar la tarea el resto del tiempo.
-  const pickerActiveRef = useRef(false);
+  // Radix lo trata como un clic fuera del diálogo (lo cerraría) y además le
+  // roba el foco de vuelta al diálogo (el Picker se ve pero no responde a
+  // clics). Ambas cosas se desactivan solo mientras el Picker está abierto,
+  // para no perder el comportamiento normal el resto del tiempo.
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (!task) return;
@@ -165,14 +166,14 @@ export function TaskPreviewDialog({
             }
           }
           if (data.action === window.google.picker.Action.PICKED || data.action === window.google.picker.Action.CANCEL) {
-            pickerActiveRef.current = false;
+            setPickerOpen(false);
           }
         })
         .build();
-      pickerActiveRef.current = true;
+      setPickerOpen(true);
       picker.setVisible(true);
     } catch (reason) {
-      pickerActiveRef.current = false;
+      setPickerOpen(false);
       setError(reason instanceof Error ? reason.message : "No se pudo abrir Google Picker");
     } finally {
       setOpeningPicker(false);
@@ -213,8 +214,9 @@ export function TaskPreviewDialog({
       title={task.title}
       description="Detalle, conversación y actividad de la tarea."
       size="lg"
-      onPointerDownOutside={(event) => { if (pickerActiveRef.current) event.preventDefault(); }}
-      onInteractOutside={(event) => { if (pickerActiveRef.current) event.preventDefault(); }}
+      modal={!pickerOpen}
+      onPointerDownOutside={(event) => { if (pickerOpen) event.preventDefault(); }}
+      onInteractOutside={(event) => { if (pickerOpen) event.preventDefault(); }}
     >
       <div className={`card ${priority.card} p-5`}>
         <div className="flex flex-wrap items-center justify-between gap-3">

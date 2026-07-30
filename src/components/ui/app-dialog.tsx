@@ -13,6 +13,7 @@ export function AppDialog({
   scrollable = true,
   onPointerDownOutside,
   onInteractOutside,
+  modal = true,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -27,10 +28,17 @@ export function AppDialog({
   // al botón de guardar.
   onPointerDownOutside?: (event: Event) => void;
   onInteractOutside?: (event: Event) => void;
+  // Con `modal` (por defecto), Radix atrapa el foco dentro del diálogo y se lo
+  // roba de vuelta a cualquier elemento externo que intente tomarlo, incluido
+  // el iframe de Google Picker: el resultado es que el Picker se ve encima
+  // pero no responde a clics. Pasar `false` mientras el Picker está abierto
+  // libera esa trampa de foco sin cerrar el diálogo (eso lo maneja
+  // onPointerDownOutside/onInteractOutside).
+  modal?: boolean;
 }) {
   const width = { sm: "max-w-md", md: "max-w-2xl", lg: "max-w-4xl" }[size];
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={onOpenChange} modal={modal}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-[rgb(20_28_26/0.6)] backdrop-blur-sm" />
         <Dialog.Content

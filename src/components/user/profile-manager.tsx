@@ -39,6 +39,7 @@ export function ProfileManager() {
   const [driveError, setDriveError] = useState("");
   const [savingDrive, setSavingDrive] = useState(false);
   const [openingPicker, setOpeningPicker] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } = useForm<ProfileInput>({
     resolver: zodResolver(profileSchema),
@@ -154,19 +155,25 @@ export function ProfileManager() {
         .addView(folderView)
         .setTitle("Selecciona la carpeta raiz de TaskKeep")
         .setCallback((data: PickerResponse) => {
-          if (data.action !== window.google.picker.Action.PICKED) return;
-          const folder = data.docs?.[0];
-          if (folder?.id) {
-            // Elegir la carpeta con el Picker es lo que la autoriza para la app
-            // bajo el alcance `drive.file`; por eso se envía su identificador.
-            setDriveFolderId(folder.id);
-            setDriveLink(folder.url || `https://drive.google.com/drive/folders/${folder.id}`);
-            setDriveFolderName(folder.name ?? "Carpeta seleccionada");
+          if (data.action === window.google.picker.Action.PICKED) {
+            const folder = data.docs?.[0];
+            if (folder?.id) {
+              // Elegir la carpeta con el Picker es lo que la autoriza para la app
+              // bajo el alcance `drive.file`; por eso se envía su identificador.
+              setDriveFolderId(folder.id);
+              setDriveLink(folder.url || `https://drive.google.com/drive/folders/${folder.id}`);
+              setDriveFolderName(folder.name ?? "Carpeta seleccionada");
+            }
+          }
+          if (data.action === window.google.picker.Action.PICKED || data.action === window.google.picker.Action.CANCEL) {
+            setPickerOpen(false);
           }
         })
         .build();
+      setPickerOpen(true);
       picker.setVisible(true);
     } catch (error) {
+      setPickerOpen(false);
       setDriveError(error instanceof Error ? error.message : "No se pudo abrir Google Picker");
     } finally {
       setOpeningPicker(false);
@@ -285,6 +292,7 @@ export function ProfileManager() {
         title="Carpeta de Google Drive"
         description="Elige con Google Picker la carpeta raiz donde TaskKeep organizara los archivos aprobados."
         size="md"
+        modal={!pickerOpen}
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
       >
