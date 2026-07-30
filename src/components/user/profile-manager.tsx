@@ -53,9 +53,12 @@ export function ProfileManager() {
         if (!response.ok) throw new Error(body.error ?? "No se pudo cargar el perfil");
         const company = currentCompany(body.data.company);
         reset({ full_name: body.data.full_name, email: body.data.email, current_password: "", new_password: "" });
-        setDriveLink(company?.drive_folder_url ?? "");
+        // Si la carpeta no esta realmente conectada (id vacio), no se carga el
+        // nombre aunque el servidor lo devuelva: un nombre huerfano de una
+        // conexion anterior no debe verse como si estuviera seleccionado.
+        setDriveLink(company?.drive_folder_id ? (company?.drive_folder_url ?? "") : "");
         setDriveFolderId(company?.drive_folder_id ?? "");
-        setDriveFolderName(company?.drive_folder_name ?? "");
+        setDriveFolderName(company?.drive_folder_id ? (company?.drive_folder_name ?? "") : "");
         setMeta(body.data);
         if (body.data.must_change_password) setAccountModalOpen(true);
         const params = new URLSearchParams(window.location.search);
