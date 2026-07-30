@@ -279,7 +279,15 @@ export function ProfileManager() {
         </form>
       </AppDialog>
 
-      <AppDialog open={driveModalOpen} onOpenChange={setDriveModalOpen} title="Carpeta de Google Drive" description="Elige con Google Picker la carpeta raiz donde TaskKeep organizara los archivos aprobados." size="md">
+      <AppDialog
+        open={driveModalOpen}
+        onOpenChange={setDriveModalOpen}
+        title="Carpeta de Google Drive"
+        description="Elige con Google Picker la carpeta raiz donde TaskKeep organizara los archivos aprobados."
+        size="md"
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
+      >
         <div className="space-y-4">
           <div className="rounded-lg border border-[var(--primary)] bg-[var(--primary-wash)] p-4 text-sm leading-6 text-[var(--ink)]">
             Primero conecta Google. Luego selecciona una carpeta accesible para esa cuenta. Los colaboradores/as usaran esta carpeta automaticamente al subir archivos.
@@ -349,7 +357,7 @@ declare global {
     gapi: { load: (name: string, options: { callback: () => void }) => void };
     google: {
       picker: {
-        Action: { PICKED: string };
+        Action: { PICKED: string; CANCEL: string };
         ViewId: { FOLDERS: string };
         DocsView: new (viewId: string) => {
           setIncludeFolders: (value: boolean) => Window["google"]["picker"]["DocsView"]["prototype"];

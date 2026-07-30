@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarClock, Check, Clock3, FileText, FolderOpen, History, MessageSquare, Pencil, Pin, PinOff, Send, Trash2, Upload, UserRound, X } from "lucide-react";
 import { format, isBefore } from "date-fns";
 import { es } from "date-fns/locale";
@@ -61,6 +61,11 @@ export function TaskPreviewDialog({
   const [destinationFolder, setDestinationFolder] = useState("");
   const [destinationFolderName, setDestinationFolderName] = useState("");
   const [openingPicker, setOpeningPicker] = useState(false);
+  // Google Picker se inyecta fuera del portal de Radix: mientras está abierto,
+  // Radix lo trata como un clic fuera del diálogo y lo cierra solo. Se bloquea
+  // el cierre por fuera solo durante esa ventana, para no perder el clic afuera
+  // como forma normal de cerrar la tarea el resto del tiempo.
+  const pickerActiveRef = useRef(false);
 
   useEffect(() => {
     if (!task) return;
@@ -152,16 +157,22 @@ export function TaskPreviewDialog({
         .addView(folderView)
         .setTitle("Elige la carpeta de Drive para esta tarea")
         .setCallback((data: PickerResponse) => {
-          if (data.action !== window.google.picker.Action.PICKED) return;
-          const folder = data.docs?.[0];
-          if (folder?.id) {
-            setDestinationFolder(folder.id);
-            setDestinationFolderName(folder.name ?? "Carpeta seleccionada");
+          if (data.action === window.google.picker.Action.PICKED) {
+            const folder = data.docs?.[0];
+            if (folder?.id) {
+              setDestinationFolder(folder.id);
+              setDestinationFolderName(folder.name ?? "Carpeta seleccionada");
+            }
+          }
+          if (data.action === window.google.picker.Action.PICKED || data.action === window.google.picker.Action.CANCEL) {
+            pickerActiveRef.current = false;
           }
         })
         .build();
+      pickerActiveRef.current = true;
       picker.setVisible(true);
     } catch (reason) {
+      pickerActiveRef.current = false;
       setError(reason instanceof Error ? reason.message : "No se pudo abrir Google Picker");
     } finally {
       setOpeningPicker(false);
@@ -196,7 +207,15 @@ export function TaskPreviewDialog({
   };
 
   return (
-    <AppDialog open onOpenChange={onOpenChange} title={task.title} description="Detalle, conversación y actividad de la tarea." size="lg">
+    <AppDialog
+      open
+      onOpenChange={onOpenChange}
+      title={task.title}
+      description="Detalle, conversación y actividad de la tarea."
+      size="lg"
+      onPointerDownOutside={(event) => { if (pickerActiveRef.current) event.preventDefault(); }}
+      onInteractOutside={(event) => { if (pickerActiveRef.current) event.preventDefault(); }}
+    >
       <div className={`card ${priority.card} p-5`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className={priority.badge}>{priority.label}</span>
