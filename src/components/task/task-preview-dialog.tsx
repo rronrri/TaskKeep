@@ -56,14 +56,6 @@ export function TaskPreviewDialog({
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [openingPicker, setOpeningPicker] = useState(false);
-  const [savingFolder, setSavingFolder] = useState(false);
-  // Google Picker se inyecta fuera del portal de Radix: mientras está abierto,
-  // Radix lo trata como un clic fuera del diálogo (lo cerraría) y además le
-  // roba el foco de vuelta al diálogo (el Picker se ve pero no responde a
-  // clics). Ambas cosas se desactivan solo mientras el Picker está abierto,
-  // para no perder el comportamiento normal el resto del tiempo.
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (!task) return;
@@ -128,77 +120,6 @@ export function TaskPreviewDialog({
     setDetail((current) => current ? { ...current, files: [body.data, ...current.files] } : current);
   };
 
-  const changeDriveFolder = async () => {
-    setError("");
-    setOpeningPicker(true);
-    try {
-      await loadScript("https://apis.google.com/js/api.js");
-      await new Promise<void>((resolve) => window.gapi.load("picker", { callback: resolve }));
-      const [configResponse, tokenResponse] = await Promise.all([
-        fetch("/api/google/picker-config", { cache: "no-store" }),
-        fetch(`/api/tasks/${task.id}/drive-picker-token`, { cache: "no-store" }),
-      ]);
-      const configBody = await configResponse.json();
-      const tokenBody = await tokenResponse.json();
-      if (!configResponse.ok) throw new Error(configBody.error ?? "Google Picker no esta configurado");
-      if (!tokenResponse.ok) throw new Error(tokenBody.error ?? "No se pudo obtener acceso temporal a Google Drive");
-
-      const folderView = new window.google.picker.DocsView(window.google.picker.ViewId.FOLDERS)
-        .setIncludeFolders(true)
-        .setSelectFolderEnabled(true)
-        .setMimeTypes("application/vnd.google-apps.folder");
-      const picker = new window.google.picker.PickerBuilder()
-        .setAppId(configBody.appId)
-        .setDeveloperKey(configBody.apiKey)
-        .setOAuthToken(tokenBody.access_token)
-        .addView(folderView)
-        .setTitle("Elige la carpeta de Drive para esta tarea")
-        .setCallback((data: PickerResponse) => {
-          if (data.action === window.google.picker.Action.PICKED) {
-            const folder = data.docs?.[0];
-            if (folder?.id) void saveDriveFolder(folder.id);
-          }
-          if (data.action === window.google.picker.Action.PICKED || data.action === window.google.picker.Action.CANCEL) {
-            setPickerOpen(false);
-          }
-        })
-        .build();
-      setPickerOpen(true);
-      // El Picker mide la página al mostrarse; si el diálogo todavía no soltó
-      // el bloqueo de scroll (React aplica el cambio de `modal` un instante
-      // después de este `setPickerOpen`), el Picker se centra mal. Un frame
-      // de margen alcanza para que el DOM ya esté actualizado.
-      requestAnimationFrame(() => picker.setVisible(true));
-    } catch (reason) {
-      setPickerOpen(false);
-      setError(reason instanceof Error ? reason.message : "No se pudo abrir Google Picker");
-    } finally {
-      setOpeningPicker(false);
-    }
-  };
-
-  // Guarda de una vez en la tarea (no queda solo en memoria de este diálogo):
-  // el mismo campo que se puede tocar editando la tarea.
-  const saveDriveFolder = async (folderId: string) => {
-    setSavingFolder(true);
-    setError("");
-    const response = await fetch(`/api/tasks/${task.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ drive_folder_id: folderId }),
-    });
-    const body = await response.json();
-    setSavingFolder(false);
-    if (!response.ok) {
-      setError(body.error ?? "No se pudo cambiar la carpeta de Drive");
-      return;
-    }
-    setDetail((current) => current ? {
-      ...current,
-      capabilities: { ...current.capabilities, driveConfigured: true, taskFolderId: body.data.drive_folder_id, taskFolderName: body.data.drive_folder_name },
-    } : current);
-  };
-
   return (
     <AppDialog
       open
@@ -206,9 +127,6 @@ export function TaskPreviewDialog({
       title={task.title}
       description="Detalle, conversación y actividad de la tarea."
       size="lg"
-      modal={!pickerOpen}
-      onPointerDownOutside={(event) => { if (pickerOpen) event.preventDefault(); }}
-      onInteractOutside={(event) => { if (pickerOpen) event.preventDefault(); }}
     >
       <div className={`card ${priority.card} p-5`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -263,9 +181,9 @@ export function TaskPreviewDialog({
           </div>
         ) : (
           <div className="mt-4">
-            {/* Cambiar la carpeta acá guarda directo en tasks.drive_folder_id (PATCH
-                /api/tasks/[id]): es lo mismo que editar la tarea, no un estado
-                aparte que se pierda al cerrar el diálogo. */}
+            {/* La carpeta de destino de una tarea se asigna editándola (persiste en
+                tasks.drive_folder_id); aquí solo se sube al destino ya asignado,
+                sin selector aparte que se perdiera al cerrar el diálogo. */}
             {role === "manager" && detail.capabilities.canUpload && !detail.capabilities.driveConfigured && (
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#9A7B24] bg-[#F3EDDC] p-4">
                 <p className="text-sm font-semibold text-[#6b5619]">Conecta tu Google Drive para poder subir archivos en tus tareas.</p>
@@ -276,16 +194,9 @@ export function TaskPreviewDialog({
               </div>
             )}
             {role === "manager" && detail.capabilities.canUpload && detail.capabilities.driveConfigured && (
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--primary)] bg-[var(--primary-wash)] p-4">
-                <div>
-                  <p className="text-sm font-bold text-[var(--ink)]">Destino en Google Drive</p>
-                  <p className="mt-1 text-xs text-[var(--ink-soft)]">Los archivos se guardan en &quot;{detail.capabilities.taskFolderName}&quot;.</p>
-                </div>
-                <button type="button" disabled={openingPicker || savingFolder || busy} onClick={() => void changeDriveFolder()} className="btn btn-ghost !px-3 !py-2 text-sm !text-[var(--primary)]">
-                  <FolderOpen size={17} />
-                  {savingFolder ? "Guardando..." : openingPicker ? "Abriendo Google..." : "Cambiar carpeta"}
-                </button>
-              </div>
+              <p className="mb-4 rounded-md border border-[var(--primary)] bg-[var(--primary-wash)] p-4 text-sm text-[var(--ink)]">
+                Los archivos se guardan en <strong>&quot;{detail.capabilities.taskFolderName}&quot;</strong>. Para cambiar la carpeta de esta tarea, editala.
+              </p>
             )}
             {detail.capabilities.canUpload && <div className="mb-4 rounded-md border border-dashed border-[var(--line-strong)] bg-[var(--paper)] p-4"><label className={`inline-flex items-center gap-2 rounded-md px-4 py-2.5 font-bold ${detail.capabilities.driveConfigured ? "bg-[var(--primary)] text-white" : "cursor-not-allowed bg-[var(--paper-deep)] text-[var(--line-strong)]"}`}><Upload size={18} /> Subir archivo<input type="file" className="hidden" disabled={!detail.capabilities.driveConfigured || busy} accept=".pdf,.png,.jpg,.jpeg,.txt,.docx" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); event.target.value = ""; }} /></label><p className="mt-2 text-xs text-[var(--ink-soft)]">{role === "collaborator" ? "Tu archivo quedará pendiente hasta que un/a gestor/a lo apruebe." : "Los archivos subidos por gestores/as quedan aprobados automáticamente."}</p>{!detail.capabilities.driveConfigured && role === "collaborator" && <p className="mt-2 text-xs font-semibold text-[#9A7B24]">El/la gestor/a debe conectar Google Drive y configurar una carpeta raíz desde su perfil.</p>}</div>}
             <div className="space-y-3">{detail.files.length === 0 ? <p className="rounded-md bg-[var(--paper)] p-4 text-sm text-[var(--ink-soft)]">No hay archivos adjuntos.</p> : detail.files.map((file) => {
@@ -323,45 +234,4 @@ function formatBytes(value?: number | null) {
   if (!value) return "Tamaño no disponible";
   if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function loadScript(src: string) {
-  return new Promise<void>((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing) return resolve();
-    const script = document.createElement("script");
-    script.src = src;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("No se pudo cargar Google Picker"));
-    document.body.appendChild(script);
-  });
-}
-
-type PickerResponse = { action: string; docs?: Array<{ id: string; name?: string }> };
-
-declare global {
-  interface Window {
-    gapi: { load: (name: string, options: { callback: () => void }) => void };
-    google: {
-      picker: {
-        Action: { PICKED: string; CANCEL: string };
-        ViewId: { FOLDERS: string };
-        DocsView: new (viewId: string) => {
-          setIncludeFolders: (value: boolean) => Window["google"]["picker"]["DocsView"]["prototype"];
-          setSelectFolderEnabled: (value: boolean) => Window["google"]["picker"]["DocsView"]["prototype"];
-          setMimeTypes: (value: string) => Window["google"]["picker"]["DocsView"]["prototype"];
-        };
-        PickerBuilder: new () => {
-          setAppId: (value: string) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
-          setDeveloperKey: (value: string) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
-          setOAuthToken: (value: string) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
-          addView: (value: unknown) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
-          setTitle: (value: string) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
-          setCallback: (callback: (data: PickerResponse) => void) => Window["google"]["picker"]["PickerBuilder"]["prototype"];
-          build: () => { setVisible: (value: boolean) => void };
-        };
-      };
-    };
-  }
 }
