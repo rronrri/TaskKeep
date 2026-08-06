@@ -247,7 +247,6 @@ export function TaskEditorDialog({
       title={dialogTitle}
       description={dialogDescription}
       size="lg"
-      scrollable={false}
       modal={!pickerOpen}
       onPointerDownOutside={(event) => { if (pickerOpen) event.preventDefault(); }}
       onInteractOutside={(event) => { if (pickerOpen) event.preventDefault(); }}
